@@ -1,0 +1,55 @@
+{
+  "recordings": [
+    {
+      "path": "outputs/recordings/blink/26-11/26-11-06/00-19-37_LivingRoom_001.mp4",
+      "bytes": 1550178,
+      "sha256": "fc938b1f98480ab3cdf643aaaa84f04a3eb10ad89de3a9546cc6cbc7755d198d",
+      "identical_across_snapshots": true,
+      "media": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "width": 1920,
+            "height": 1080,
+            "nb_frames": "253",
+            "nb_read_frames": "245"
+          }
+        ],
+        "format": {
+          "duration": "16.875678"
+        }
+      },
+      "strict_decode_clean": false,
+      "decoder_note": "FFmpeg reports SEI-only 9-byte samples without pictures. Tolerant decoding completes; macOS avconvert fails. Original files preserved unchanged."
+    },
+    {
+      "path": "outputs/recordings/blink/26-11/26-11-06/00-20-42_LitterRobot_002.mp4",
+      "bytes": 4572397,
+      "sha256": "907e128a97fab1fd6d4a295bae27db99337f95ae273466db1f1dc2048267d13f",
+      "identical_across_snapshots": true,
+      "media": {
+        "programs": [],
+        "stream_groups": [],
+        "streams": [
+          {
+            "width": 1920,
+            "height": 1080,
+            "nb_frames": "466",
+            "nb_read_frames": "451"
+          }
+        ],
+        "format": {
+          "duration": "31.083078"
+        }
+      },
+      "strict_decode_clean": false,
+      "decoder_note": "FFmpeg reports SEI-only 9-byte samples without pictures. Tolerant decoding completes; macOS avconvert fails. Original files preserved unchanged."
+    }
+  ],
+  "user_confirmed_after_snapshots": {
+    "both_clips_play_in_blink": true,
+    "no_visible_storage_disconnect": true
+  },
+  "new_recording_after_snapshots": "not yet verified"
+}

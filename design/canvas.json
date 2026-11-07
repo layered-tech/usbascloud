@@ -1,0 +1,15 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-07T02:28:42Z" },
+  "title": "USBCloud Landing Page",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1440, "h": 1100, "title": "Fleet overview", "expand": "fill", "is_interactive": true }
+  },
+  "order": ["Main.dc.html"],
+  "notes": {},
+  "designSystems": [
+    { "title": "USBCloud", "namespace": "usbcloud", "artifact": "https://claude.ai/code/artifact/94b4ca5a-58b7-4104-9f7a-641480913217", "version": "1794018166-6fee", "copiedAt": "2026-11-07T02:28:42Z" }
+  ]
+}

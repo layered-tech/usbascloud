@@ -1,0 +1,74 @@
+/* USBCloud tokens — generated for this canvas from the design system's tokens.json (v1). */
+
+@font-face { font-family: "IBM Plex Mono"; src: url("fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("fonts/ibm-plex-mono-latin-500-normal.woff2") format("woff2"); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: "IBM Plex Mono"; src: url("fonts/ibm-plex-mono-latin-600-normal.woff2") format("woff2"); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: "Space Grotesk"; src: url("fonts/space-grotesk-latin-wght-normal.woff2") format("woff2"); font-weight: 300 700; font-style: normal; font-display: swap; }
+
+:root {
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-sans: "Space Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  --radius-none: 0px;
+  --radius-sm: 2px;
+  --radius-pill: 999px;
+
+  --stroke-hair: 1px;
+  --stroke-rule: 2px;
+
+  --shadow-none: none;
+}
+
+/* Phosphor — the default: green on the tube's black. */
+:root, [data-theme="phosphor"] {
+  --surface: #070a07;
+  --surface-raised: #0e140e;
+  --surface-sunken: #030503;
+  --line: #1f2b1f;
+  --line-strong: #32713d;
+  --ink: #c8f2cc;
+  --ink-muted: #72ab7b;
+  --ink-faint: #3f6b47;
+  --phosphor: #46ff7a;
+  --phosphor-soft: #0d2a16;
+  --phosphor-dim: #1f7a3a;
+  --on-phosphor: #041008;
+  --inverse: #c8f2cc;
+  --on-inverse: #070a07;
+  --link: #46ff7a;
+  --focus-ring: #46ff7a;
+  --scrim: rgba(3, 5, 3, 0.78);
+  --glow: 0 0 0 1px #1f7a3a, 0 0 18px rgba(70, 255, 122, 0.28);
+  --glow-strong: 0 0 0 2px #46ff7a, 0 0 24px rgba(70, 255, 122, 0.45);
+}
+
+/* Paper — the same drawing printed out: deep green ink on cool off-white. */
+[data-theme="paper"] {
+  --surface: #f3f6f1;
+  --surface-raised: #ffffff;
+  --surface-sunken: #e7ece4;
+  --line: #c6d1c3;
+  --line-strong: #5f8060;
+  --ink: #0f1f14;
+  --ink-muted: #426a4c;
+  --ink-faint: #7f9a82;
+  --phosphor: #0b7a3b;
+  --phosphor-soft: #d7f3e0;
+  --phosphor-dim: #3f9560;
+  --on-phosphor: #ffffff;
+  --inverse: #0f1f14;
+  --on-inverse: #f3f6f1;
+  --link: #0b7a3b;
+  --focus-ring: #0b7a3b;
+  --scrim: rgba(15, 31, 20, 0.42);
+  --glow: 0 0 0 1px #3f9560;
+  --glow-strong: 0 0 0 2px #0b7a3b;
+}

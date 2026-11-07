@@ -1,0 +1,6 @@
+# Local setup history, credentials, and device diagnostics
+/work/
+/**/.idea
+
+# Device recordings stay local
+/outputs/recordings/

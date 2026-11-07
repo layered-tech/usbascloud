@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>USBCloud — Fleet overview</title>
+<script src="./support.js"></script>
+<link rel="stylesheet" href="ds/usbcloud/tokens.css">
+<link rel="stylesheet" href="ds/usbcloud/components/bundle.css">
+<script src="ds/usbcloud/components/bundle.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body { margin: 0; }
+.uc-card { width: 100%; }
+a { color: var(--phosphor); text-decoration: none; } a:hover { text-decoration: underline; }
+</style>
+</helmet>
+<div data-theme="{{theme}}" style="min-height: 100vh; display: flex; flex-wrap: wrap; align-items: stretch; background: var(--surface); color: var(--ink); font-family: var(--font-mono); font-size: 14px; line-height: 22px;">
+
+  <div style="flex: 0 0 224px; display: flex; flex-direction: column;">
+    <x-import component-from-global-scope="USBCloud.SideNav" brand="USBCloud" version="v2.4.1" sections="{{nav}}" active="{{screen}}" on-change="{{goTo}}" footer="chris · admin"></x-import>
+  </div>
+
+  <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column;">
+
+    <sc-if value="{{isDevices}}" hint-placeholder-val="{{yes}}">
+      <x-import component-from-global-scope="USBCloud.Toolbar" title="Fleet overview" crumbs="{{crumbsDevices}}">
+        <x-import component-from-global-scope="USBCloud.Button" variant="ghost" icon="search">Find</x-import>
+        <x-import component-from-global-scope="USBCloud.Button" icon="sliders-horizontal">Filter</x-import>
+        <x-import component-from-global-scope="USBCloud.Button" variant="primary" icon="cloud-download">Pull new files</x-import>
+      </x-import>
+      <x-import component-from-global-scope="USBCloud.Tabs" items="{{deviceTabs}}" active="{{tab}}" on-change="{{setTab}}"></x-import>
+
+      <div style="padding: 24px 32px 32px; display: flex; flex-direction: column; gap: 24px;">
+
+        <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px;">
+          <div style="padding: 16px; border: 1px solid var(--line); background: var(--surface-raised); display: flex; flex-direction: column; gap: 4px;">
+            <div class="uc-label" style="color: var(--ink-muted);">Devices</div>
+            <div style="font-size: 22px; line-height: 28px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink);">{{stats.total}}</div>
+            <div class="uc-data" style="color: var(--ink-muted);">{{stats.totalLine}}</div>
+          </div>
+          <div style="padding: 16px; border: 1px solid var(--line); background: var(--surface-raised); display: flex; flex-direction: column; gap: 4px;">
+            <div class="uc-label" style="color: var(--ink-muted);">Syncing</div>
+            <div style="font-size: 22px; line-height: 28px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--phosphor);">{{stats.syncing}}</div>
+            <div class="uc-data" style="color: var(--ink-muted);">{{stats.syncingLine}}</div>
+          </div>
+          <div style="padding: 16px; border: 1px solid var(--line); background: var(--surface-raised); display: flex; flex-direction: column; gap: 4px;">
+            <div class="uc-label" style="color: var(--ink-muted);">Pending files</div>
+            <div style="font-size: 22px; line-height: 28px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink);">{{stats.pending}}</div>
+            <div class="uc-data" style="color: var(--ink-muted);">{{stats.pendingLine}}</div>
+          </div>
+          <div style="padding: 16px; border: 1px solid var(--line); background: var(--surface-raised); display: flex; flex-direction: column; gap: 4px;">
+            <div class="uc-label" style="color: var(--ink-muted);">Faults</div>
+            <div style="font-size: 22px; line-height: 28px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink);"><span style="background: var(--inverse); color: var(--on-inverse); padding: 0 6px;">{{stats.faults}}</span></div>
+            <div class="uc-data" style="color: var(--ink-muted);">{{stats.faultLine}}</div>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;">
+          <div style="flex: 999 1 560px; min-width: 0; overflow-x: auto;">
+            <x-import component-from-global-scope="USBCloud.DataTable" caption="{{caption}}" columns="{{deviceColumns}}" rows="{{deviceRows}}" selected-key="{{selected}}" on-select-row="{{selectRow}}" empty-text="0 devices match."></x-import>
+          </div>
+
+          <aside style="flex: 0 0 320px; display: flex; flex-direction: column; gap: 16px;">
+            <x-import component-from-global-scope="USBCloud.DeviceCard" device="{{sel.device}}" selected="{{yes}}" actions="{{sel.actions}}"></x-import>
+
+            <section style="border: 1px solid var(--line); background: var(--surface-raised); padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+              <div class="uc-label" style="color: var(--ink-muted);">Details</div>
+              <dl class="uc-data" style="margin: 0; display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 8px 12px;">
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Mount</dt>
+                <dd style="margin: 0; color: var(--ink);">{{sel.mount}}</dd>
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Address</dt>
+                <dd style="margin: 0; color: var(--ink);">{{sel.addr}}</dd>
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Firmware</dt>
+                <dd style="margin: 0; color: var(--ink);">{{sel.fw}}</dd>
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Uptime</dt>
+                <dd style="margin: 0; color: var(--ink);">{{sel.uptime}}</dd>
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Filesystem</dt>
+                <dd style="margin: 0; color: var(--ink);">{{sel.fs}}</dd>
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Free</dt>
+                <dd style="margin: 0; color: var(--ink);">{{sel.free}}</dd>
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Last file</dt>
+                <dd style="margin: 0; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{sel.lastFile}}">{{sel.lastFile}}</dd>
+              </dl>
+              <div style="display: flex; gap: 8px; justify-content: flex-end; padding-top: 12px; border-top: 1px solid var(--line);">
+                <x-import component-from-global-scope="USBCloud.Button" size="small" variant="ghost" icon="terminal" on-click="{{goLog}}">Show log</x-import>
+                <x-import component-from-global-scope="USBCloud.Button" size="small" icon="folder" on-click="{{goFiles}}">Show files</x-import>
+              </div>
+            </section>
+
+          </aside>
+        </div>
+
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isFiles}}" hint-placeholder-val="{{no}}">
+      <x-import component-from-global-scope="USBCloud.Toolbar" title="Files" crumbs="{{crumbsFiles}}">
+        <x-import component-from-global-scope="USBCloud.Input" prompt="/" placeholder="Filter by name or device" aria-label="Filter files"></x-import>
+        <x-import component-from-global-scope="USBCloud.Button" icon="download">Download selected</x-import>
+        <x-import component-from-global-scope="USBCloud.Button" variant="primary" icon="cloud-download">Pull pending</x-import>
+      </x-import>
+      <x-import component-from-global-scope="USBCloud.Tabs" items="{{fileTabs}}" active="{{fileTab}}" on-change="{{setFileTab}}"></x-import>
+      <div style="padding: 24px 32px 32px; display: flex; flex-direction: column; gap: 24px;">
+        <div style="overflow-x: auto;">
+          <x-import component-from-global-scope="USBCloud.DataTable" caption="{{fileCaption}}" columns="{{fileColumns}}" rows="{{fileRows}}" row-key="path" selected-key="{{selectedFile}}" on-select-row="{{selectFile}}" empty-text="0 files match."></x-import>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isLog}}" hint-placeholder-val="{{no}}">
+      <x-import component-from-global-scope="USBCloud.Toolbar" title="Logs" crumbs="{{crumbsServer}}">
+        <x-import component-from-global-scope="USBCloud.Button" variant="ghost" icon="x" on-click="{{closeLogs}}">Close all</x-import>
+        <x-import component-from-global-scope="USBCloud.Button" icon="download">Export open logs</x-import>
+        <x-import component-from-global-scope="USBCloud.Button" icon="terminal" on-click="{{addLogRow}}">Add row</x-import>
+      </x-import>
+      <div style="padding: 24px 32px 32px; display: flex; flex-direction: column; gap: 16px;">
+        <sc-if value="{{noLogsOpen}}" hint-placeholder-val="{{no}}">
+          <div class="uc-data" style="padding: 24px; border: 1px dashed var(--line-strong); color: var(--ink-muted); text-align: center;">0 logs open. Add a row to start.</div>
+        </sc-if>
+        <sc-for list="{{logRows}}" as="row" hint-placeholder-count="1">
+          <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: stretch;">
+            <sc-for list="{{row.panes}}" as="p" hint-placeholder-count="1">
+              <div style="flex: 1 1 360px; min-width: 0; display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <div style="flex: 1; min-width: 0;">
+                    <x-import component-from-global-scope="USBCloud.Select" options="{{logSourceOptions}}" value="{{p.id}}" on-change="{{p.setSource}}" placeholder="Select a source"></x-import>
+                  </div>
+                  <x-import component-from-global-scope="USBCloud.Button" variant="ghost" icon="x" on-click="{{p.close}}" aria-label="Close this log">Close</x-import>
+                </div>
+                <x-import component-from-global-scope="USBCloud.LogPane" title="{{p.title}}" entries="{{p.entries}}" height="{{logPaneHeight}}" follow="{{yes}}" empty-text="0 entries today."></x-import>
+              </div>
+            </sc-for>
+            <div style="flex: 0 0 auto; display: flex; align-items: center;">
+              <x-import component-from-global-scope="USBCloud.Button" variant="ghost" icon="chevron-right" on-click="{{row.add}}" aria-label="Add a log to this row">Add to row</x-import>
+            </div>
+          </div>
+        </sc-for>
+        <div style="display: flex; justify-content: flex-start; padding-top: 16px; border-top: 1px solid var(--line);">
+          <x-import component-from-global-scope="USBCloud.Button" variant="ghost" icon="chevron-down" on-click="{{addLogRow}}">Add row</x-import>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isSettings}}" hint-placeholder-val="{{no}}">
+      <x-import component-from-global-scope="USBCloud.Toolbar" title="Settings" crumbs="{{crumbsServer}}">
+        <x-import component-from-global-scope="USBCloud.Button" variant="ghost" icon="refresh-cw">Reload config</x-import>
+      </x-import>
+      <div style="padding: 24px 32px 32px; display: flex; flex-direction: column; gap: 24px; max-width: 520px;">
+
+        <section style="display: flex; flex-direction: column; gap: 12px;">
+          <h2 class="uc-heading" style="margin: 0; color: var(--ink);">Server</h2>
+          <x-import component-from-global-scope="USBCloud.Input" label="Server name" default-value="usbcloud-01"></x-import>
+          <x-import component-from-global-scope="USBCloud.Input" label="Listen address" default-value="0.0.0.0:8443" hint="Host and port the clients dial in to."></x-import>
+          <x-import component-from-global-scope="USBCloud.Input" label="Storage root" prompt="&gt;" default-value="/var/lib/usbcloud/store" hint="Pulled files land here, one folder per device."></x-import>
+        </section>
+
+        <section style="display: flex; flex-direction: column; gap: 12px;">
+          <h2 class="uc-heading" style="margin: 0; color: var(--ink);">Sync</h2>
+          <x-import component-from-global-scope="USBCloud.Input" label="Pull interval" default-value="30" hint="Seconds. Minimum is 5 seconds."></x-import>
+          <x-import component-from-global-scope="USBCloud.Select" label="Conflict policy" options="{{conflictOptions}}" value="{{conflict}}" on-change="{{setConflict}}"></x-import>
+          <x-import component-from-global-scope="USBCloud.Select" label="Theme" options="{{themeOptions}}" value="{{theme}}" on-change="{{setTheme}}"></x-import>
+        </section>
+
+        <div style="display: flex; gap: 8px; justify-content: flex-end; padding-top: 16px; border-top: 1px solid var(--line);">
+          <x-import component-from-global-scope="USBCloud.Button">Discard</x-import>
+          <x-import component-from-global-scope="USBCloud.Button" variant="primary" icon="check">Save settings</x-import>
+        </div>
+      </div>
+    </sc-if>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["phosphor","paper"],"default":"phosphor","section":"Theme"},"$preview":{"width":1440,"height":1100}}'>
+class Component extends DCLogic {
+  devices() {
+    return [
+      { id: 'WAREHOUSE-07', name: 'Dock 3 scanner', status: 'online', usedBytes: 7.4e9, totalBytes: 32e9, lastSync: '29 s ago', pending: 0, mount: '/mnt/usb0', addr: '10.0.4.17', fw: '2.4.1', uptime: '11 d 04:12', fs: 'exFAT', lastFile: 'scan_20261106_1358.pdf' },
+      { id: 'WAREHOUSE-02', name: 'Dock 1 scanner', status: 'online', usedBytes: 12.8e9, totalBytes: 32e9, lastSync: '4 min ago', pending: 3, mount: '/mnt/usb0', addr: '10.0.4.12', fw: '2.4.1', uptime: '11 d 04:09', fs: 'exFAT', lastFile: 'scan_20261106_1401.pdf' },
+      { id: 'FIELD-12', name: 'Van 12 logger', status: 'syncing', usedBytes: 19.1e9, totalBytes: 32e9, lastSync: 'just now', pending: 38, mount: '/mnt/usb0', addr: '10.0.9.112', fw: '2.4.0', uptime: '0 d 06:51', fs: 'ext4', lastFile: 'van12_20261106.csv' },
+      { id: 'FIELD-09', name: 'Van 9 logger', status: 'offline', usedBytes: 2.0e9, totalBytes: 16e9, lastSync: '4 h ago', pending: 4, mount: '/mnt/usb0', addr: '10.0.9.109', fw: '2.3.7', uptime: '0 d 00:00', fs: 'ext4', lastFile: 'van9_20261106.csv' },
+      { id: 'KIOSK-02', name: 'Lobby kiosk', status: 'fault', fault: 'mount', usedBytes: 31.2e9, totalBytes: 32e9, lastSync: '2 d ago', pending: 112, mount: '/mnt/usb0', addr: '10.0.2.22', fw: '2.2.0', uptime: '41 d 19:03', fs: 'FAT32', lastFile: 'session_8812.json' },
+      { id: 'FIELD-03', name: 'Van 3 logger', status: 'online', usedBytes: 5.6e9, totalBytes: 16e9, lastSync: '12 min ago', pending: 0, mount: '/mnt/usb0', addr: '10.0.9.103', fw: '2.4.1', uptime: '2 d 01:40', fs: 'ext4', lastFile: 'van3_20261106.csv' },
+      { id: 'LAB-01', name: 'Bench recorder', status: 'online', usedBytes: 44.0e9, totalBytes: 128e9, lastSync: '45 s ago', pending: 6, mount: '/mnt/usb1', addr: '10.0.6.5', fw: '2.4.1', uptime: '7 d 12:30', fs: 'ext4', lastFile: 'rec_1401.wav' },
+      { id: 'GATE-04', name: 'Gate camera store', status: 'online', usedBytes: 88.3e9, totalBytes: 128e9, lastSync: '3 min ago', pending: 0, mount: '/mnt/usb0', addr: '10.0.3.44', fw: '2.4.1', uptime: '19 d 08:15', fs: 'exFAT', lastFile: 'gate04_1359.mp4' },
+      { id: 'YARD-11', name: 'Yard tablet', status: 'syncing', usedBytes: 9.7e9, totalBytes: 32e9, lastSync: 'just now', pending: 21, mount: '/mnt/usb0', addr: '10.0.5.111', fw: '2.4.0', uptime: '1 d 03:22', fs: 'ext4', lastFile: 'photo_0412.jpg' },
+      { id: 'OFFICE-05', name: 'Front desk', status: 'online', usedBytes: 1.2e9, totalBytes: 16e9, lastSync: '1 h ago', pending: 0, mount: '/mnt/usb0', addr: '10.0.1.55', fw: '2.4.1', uptime: '30 d 00:48', fs: 'exFAT', lastFile: 'visitors_1215.csv' },
+      { id: 'PLANT-08', name: 'Line 8 PLC dump', status: 'online', usedBytes: 25.5e9, totalBytes: 64e9, lastSync: '2 min ago', pending: 2, mount: '/mnt/usb0', addr: '10.0.7.88', fw: '2.4.1', uptime: '5 d 16:04', fs: 'ext4', lastFile: 'line8_dump_1400.bin' },
+      { id: 'DEPOT-06', name: 'Depot scale', status: 'online', usedBytes: 0.8e9, totalBytes: 16e9, lastSync: '18 min ago', pending: 0, mount: '/mnt/usb0', addr: '10.0.8.66', fw: '2.3.9', uptime: '14 d 22:11', fs: 'FAT32', lastFile: 'weigh_1344.csv' }
+    ];
+  }
+
+  files() {
+    return [
+      { path: '/mnt/usb0/scan_20261106_1358.pdf', device: 'WAREHOUSE-07', size: '412 KB', modified: '13:58:02', state: 'pulled' },
+      { path: '/mnt/usb0/scan_20261106_1401.pdf', device: 'WAREHOUSE-02', size: '388 KB', modified: '14:01:12', state: 'pending' },
+      { path: '/mnt/usb0/log/van12_20261106.csv', device: 'FIELD-12', size: '58.2 MB', modified: '14:02:30', state: 'pending' },
+      { path: '/mnt/usb0/log/van12_20261105.csv', device: 'FIELD-12', size: '61.0 MB', modified: '2026-11-05', state: 'pulled' },
+      { path: '/mnt/usb0/cam/gate04_1359.mp4', device: 'GATE-04', size: '1.4 GB', modified: '13:59:30', state: 'pulled' },
+      { path: '/mnt/usb0/kiosk/session_8812.json', device: 'KIOSK-02', size: '14 KB', modified: '2026-11-04', state: 'pending' },
+      { path: '/mnt/usb0/plc/line8_dump_1400.bin', device: 'PLANT-08', size: '24.3 MB', modified: '14:00:02', state: 'pulled' },
+      { path: '/mnt/usb0/yard/photo_0412.jpg', device: 'YARD-11', size: '3.1 MB', modified: '14:02:31', state: 'pending' },
+      { path: '/mnt/usb1/bench/rec_1401.wav', device: 'LAB-01', size: '212 MB', modified: '14:01:55', state: 'pending' },
+      { path: '/mnt/usb0/log/van9_20261106.csv', device: 'FIELD-09', size: '12.8 MB', modified: '09:41:03', state: 'pending' }
+    ];
+  }
+
+  serverLog() {
+    return [
+      { id: 1, time: '13:44:27', level: 'ok', source: 'DEPOT-06', message: 'Pull complete: 0 new files.' },
+      { id: 2, time: '13:58:40', level: 'ok', source: 'WAREHOUSE-02', message: 'Pull complete: 3 new files (1.2 MB).' },
+      { id: 3, time: '14:00:02', level: 'ok', source: 'PLANT-08', message: 'Pull complete: 2 new files (48.6 MB).' },
+      { id: 4, time: '14:01:10', level: 'warn', source: 'KIOSK-02', message: 'Storage at 97%: 0.8 GB free.' },
+      { id: 5, time: '14:01:12', level: 'err', source: 'KIOSK-02', message: 'Mount failed: device busy (EBUSY); retry in 30 s.' },
+      { id: 6, time: '14:02:11', level: 'ok', source: 'WAREHOUSE-07', message: 'Pull complete: 0 new files.' },
+      { id: 7, time: '14:02:30', level: 'info', source: 'FIELD-12', message: 'Sync started: 38 files queued (2.1 GB).' },
+      { id: 8, time: '14:02:31', level: 'info', source: 'YARD-11', message: 'Sync started: 21 files queued (640 MB).' },
+      { id: 9, time: '14:02:40', level: 'info', message: 'Next scheduled pull in 27 s.' }
+    ];
+  }
+
+  fmtGB(n) { return (n / 1e9).toFixed(1) + ' GB'; }
+
+  deviceLog(d) {
+    var at = { 'WAREHOUSE-07': '14:02:11', 'WAREHOUSE-02': '13:58:40', 'FIELD-12': '14:02:30', 'FIELD-09': '09:41:03', 'KIOSK-02': '14:01:12', 'FIELD-03': '13:50:12', 'LAB-01': '14:01:55', 'GATE-04': '13:59:30', 'YARD-11': '14:02:31', 'OFFICE-05': '12:15:08', 'PLANT-08': '14:00:02', 'DEPOT-06': '13:44:27' }[d.id] || '14:02:40';
+    var used = this.fmtGB(d.usedBytes), total = this.fmtGB(d.totalBytes);
+    var lines = [
+      { id: 1, time: '06:00:00', level: 'info', message: 'Client ' + d.id + ' (fw ' + d.fw + ') connected from ' + d.addr + '.' },
+      { id: 2, time: '06:00:02', level: 'ok', message: 'Mounted ' + d.mount + ' (' + d.fs + '): ' + used + ' of ' + total + ' used.' }
+    ];
+    if (d.status === 'online') {
+      lines.push({ id: 3, time: at, level: 'ok', message: 'Pull complete: ' + d.pending + ' new files; last file ' + d.lastFile + '.' });
+      lines.push({ id: 4, time: at, level: 'info', message: 'Idle. Next pull on schedule.' });
+    } else if (d.status === 'syncing') {
+      lines.push({ id: 3, time: at, level: 'info', message: 'Sync started: ' + d.pending + ' files queued.' });
+      lines.push({ id: 4, time: at, level: 'info', message: 'Transferring ' + d.lastFile + ' …' });
+    } else if (d.status === 'offline') {
+      lines.push({ id: 3, time: at, level: 'warn', message: 'Heartbeat missed; ' + d.pending + ' files still pending.' });
+      lines.push({ id: 4, time: at, level: 'err', message: 'Connection lost (ETIMEDOUT); reconnecting every 60 s.' });
+    } else {
+      lines.push({ id: 3, time: '14:01:10', level: 'warn', message: 'Storage at ' + Math.round(d.usedBytes / d.totalBytes * 100) + '%: ' + this.fmtGB(d.totalBytes - d.usedBytes) + ' free.' });
+      lines.push({ id: 4, time: at, level: 'err', message: 'Mount failed: device busy (EBUSY); retry in 30 s.' });
+    }
+    return lines;
+  }
+
+  renderVals() {
+    var self = this;
+    var s = this.state || {};
+    var R = window.React, U = window.USBCloud;
+    var el = function (type, props, children) { return (R && U && U[type]) ? R.createElement(U[type], props, children) : null; };
+
+    var screen = s.screen || 'devices';
+    var tab = s.tab || 'all';
+    var fileTab = s.fileTab || 'pending';
+    var theme = s.theme || this.props.theme || 'phosphor';
+    var conflict = s.conflict || 'keep-newest';
+    var logRows = s.logRows || [['server']];
+    var setRows = function (rows) { self.setState({ logRows: rows.filter(function (r) { return r.length > 0; }) }); };
+    var copyRows = function () { return logRows.map(function (r) { return r.slice(); }); };
+
+    var devices = this.devices();
+    var count = function (st) { return devices.filter(function (d) { return d.status === st; }).length; };
+    var online = count('online'), syncing = count('syncing'), offline = count('offline'), faults = count('fault');
+    var pending = devices.reduce(function (n, d) { return n + d.pending; }, 0);
+    var pendingDevices = devices.filter(function (d) { return d.pending > 0; }).length;
+    var inFlight = devices.filter(function (d) { return d.status === 'syncing'; }).reduce(function (n, d) { return n + d.pending; }, 0);
+    var faultDevice = devices.filter(function (d) { return d.status === 'fault'; })[0];
+
+    var visible = tab === 'all' ? devices : devices.filter(function (d) { return d.status === tab; });
+    var selectedId = s.selected || 'FIELD-12';
+    var selDev = devices.filter(function (d) { return d.id === selectedId; })[0] || devices[0];
+
+    var deviceRows = visible.map(function (d) {
+      return { id: d.id, name: d.name, status: d.status, fault: d.fault, used: self.fmtGB(d.usedBytes), pending: d.pending, mount: d.mount, seen: d.lastSync };
+    });
+    var deviceColumns = [
+      { key: 'id', label: 'Device', width: 150 },
+      { key: 'name', label: 'Name' },
+      { key: 'status', label: 'Status', render: function (r) { return el('StatusBadge', { status: r.status }, r.fault ? 'Fault · ' + r.fault : undefined) || r.status.toUpperCase(); } },
+      { key: 'used', label: 'Used', align: 'right' },
+      { key: 'pending', label: 'Pending', align: 'right' },
+      { key: 'mount', label: 'Mount', muted: true },
+      { key: 'seen', label: 'Last sync', align: 'right', muted: true },
+      { key: 'refresh', label: '', align: 'right', render: function (r) { return el('Button', { size: 'small', variant: 'ghost', icon: 'refresh-cw', 'aria-label': 'Refresh ' + r.id }, 'Refresh') || 'Refresh'; } }
+    ];
+
+    var log = this.serverLog();
+    var sel = {
+      device: { id: selDev.id, name: selDev.name, status: selDev.status, usedBytes: selDev.usedBytes, totalBytes: selDev.totalBytes, lastSync: selDev.lastSync, pending: selDev.pending },
+      actions: [
+        el('Button', { key: 'r', size: 'small', variant: 'ghost', icon: 'refresh-cw' }, 'Refresh'),
+        el('Button', { key: 'p', size: 'small', variant: 'ghost', icon: 'cloud-download' }, 'Pull'),
+        el('Button', { key: 'u', size: 'small', icon: 'unplug' }, 'Unmount')
+      ].filter(Boolean),
+      mount: selDev.mount, addr: selDev.addr, fw: selDev.fw, uptime: selDev.uptime, fs: selDev.fs,
+      free: this.fmtGB(selDev.totalBytes - selDev.usedBytes) + ' of ' + this.fmtGB(selDev.totalBytes),
+      lastFile: selDev.lastFile,
+      logTitle: selDev.id + ' · log',
+      log: log.filter(function (e) { return e.source === selDev.id; })
+    };
+
+    var files = this.files();
+    var fileRows = fileTab === 'all' ? files : files.filter(function (f) { return f.state === fileTab; });
+    var pendingShown = files.filter(function (f) { return f.state === 'pending'; }).length;
+    var fileCaption = fileTab === 'pending' ? ('Showing ' + pendingShown + ' of ' + pending + ' pending files') : (fileRows.length + ' files');
+    var fileColumns = [
+      { key: 'path', label: 'File' },
+      { key: 'device', label: 'Device', width: 150 },
+      { key: 'size', label: 'Size', align: 'right' },
+      { key: 'modified', label: 'Modified', align: 'right', muted: true },
+      { key: 'state', label: 'State', render: function (r) { return r.state.toUpperCase(); } }
+    ];
+
+    return {
+      yes: true, no: false,
+      theme: theme,
+      screen: screen,
+      isDevices: screen === 'devices', isFiles: screen === 'files', isLog: screen === 'log', isSettings: screen === 'settings',
+      nav: [
+        { label: 'Fleet', items: [
+          { id: 'devices', label: 'Devices', icon: 'hard-drive', count: devices.length },
+          { id: 'files', label: 'Files', icon: 'folder', count: pending } ] },
+        { label: 'Server', items: [
+          { id: 'log', label: 'Log', icon: 'terminal' },
+          { id: 'settings', label: 'Settings', icon: 'settings' } ] }
+      ],
+      goTo: function (id) { self.setState({ screen: id }); },
+      goFiles: function () { self.setState({ screen: 'files' }); },
+      goLog: function () { self.setState({ screen: 'log', logRows: [[selDev.id, 'server']] }); },
+      closeLogs: function () { self.setState({ logRows: [] }); },
+      addLogRow: function () { setRows(copyRows().concat([['server']])); },
+      noLogsOpen: logRows.length === 0,
+      logPaneHeight: logRows.length > 1 ? 280 : 520,
+      logSourceOptions: [{ value: 'server', label: 'usbcloud-01 · server', icon: 'server' }].concat(devices.map(function (d) { return { value: d.id, label: d.id, hint: d.name, icon: 'hard-drive' }; })),
+      logRows: logRows.map(function (row, ri) {
+        return {
+          add: function () { var rows = copyRows(); rows[ri].push('server'); setRows(rows); },
+          panes: row.map(function (id, pi) {
+            var d = devices.filter(function (x) { return x.id === id; })[0];
+            return { id: id,
+              title: id === 'server' ? 'usbcloud-01 · server' : (id + ' · ' + (d ? d.name : '')),
+              entries: id === 'server' ? log : (d ? self.deviceLog(d) : []),
+              setSource: function (v) { var rows = copyRows(); rows[ri][pi] = v; setRows(rows); },
+              close: function () { var rows = copyRows(); rows[ri].splice(pi, 1); setRows(rows); } };
+          })
+        };
+      }),
+      crumbsDevices: ['USBCloud', 'Fleet'],
+      crumbsFiles: ['USBCloud', 'Fleet'],
+      crumbsServer: ['USBCloud', 'Server'],
+      deviceTabs: [
+        { id: 'all', label: 'All', count: devices.length },
+        { id: 'online', label: 'Online', count: online },
+        { id: 'syncing', label: 'Syncing', count: syncing },
+        { id: 'offline', label: 'Offline', count: offline },
+        { id: 'fault', label: 'Faults', count: faults }
+      ],
+      tab: tab,
+      setTab: function (id) { self.setState({ tab: id }); },
+      stats: {
+        total: devices.length, totalLine: online + ' online · ' + offline + ' offline',
+        syncing: syncing, syncingLine: inFlight + ' files in flight',
+        pending: pending, pendingLine: 'across ' + pendingDevices + ' devices',
+        faults: faults, faultLine: faultDevice ? (faultDevice.id + ' · ' + faultDevice.fault) : '0 faults'
+      },
+      caption: visible.length + ' of ' + devices.length + ' devices',
+      deviceColumns: deviceColumns,
+      deviceRows: deviceRows,
+      selected: selDev.id,
+      selectRow: function (r) { self.setState({ selected: r.id }); },
+      sel: sel,
+      logShort: 180,
+      logTall: 560,
+      serverLog: log,
+      fileTabs: [
+        { id: 'pending', label: 'Pending', count: pending },
+        { id: 'pulled', label: 'Pulled' },
+        { id: 'all', label: 'All' }
+      ],
+      fileTab: fileTab,
+      setFileTab: function (id) { self.setState({ fileTab: id }); },
+      fileCaption: fileCaption,
+      fileColumns: fileColumns,
+      fileRows: fileRows,
+      selectedFile: s.selectedFile || '/mnt/usb0/log/van12_20261106.csv',
+      selectFile: function (r) { self.setState({ selectedFile: r.path }); },
+      conflictOptions: [
+        { value: 'keep-newest', label: 'Keep newest', hint: 'default' },
+        { value: 'keep-both', label: 'Keep both' },
+        { value: 'keep-server', label: 'Keep server copy' }
+      ],
+      conflict: conflict,
+      setConflict: function (v) { self.setState({ conflict: v }); },
+      themeOptions: [
+        { value: 'phosphor', label: 'Phosphor', hint: 'default' },
+        { value: 'paper', label: 'Paper' }
+      ],
+      setTheme: function (v) { self.setState({ theme: v }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

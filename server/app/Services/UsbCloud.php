@@ -5,26 +5,22 @@ namespace App\Services;
 use Closure;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Sleep;
 use RuntimeException;
 use Throwable;
 
 class UsbCloud
 {
-    /** @return array<string, array<string, string>> */
+    /** @return array<string, array<string, mixed>> */
     public function connections(): array
     {
-        return config('usbcloud.devices') ?: [
-            config('usbcloud.device_id') => [
-                'name' => config('usbcloud.device_name'),
-                'host' => config('pi-poc.host'),
-                'directory' => config('pi-poc.directory'),
-            ],
-        ];
+        return app(UsbCloudDevices::class)->all();
     }
 
     public function client(string $id): PiPocClient
     {
-        $connection = $this->connections()[$id] ?? null;
+        $connection = app(UsbCloudDevices::class)->all(true)[$id] ?? null;
         if ($connection === null) {
             throw new RuntimeException('Unknown device.');
         }
@@ -59,7 +55,9 @@ class UsbCloud
         $files = [];
         foreach ($this->connections() as $id => $connection) {
             $client = $this->client($id);
+            $transfer = app(UsbCloudTransfers::class)->progress($id);
             $operation = Cache::get('usbcloud.operation.'.$id);
+            $transferring = app(UsbCloudTransfers::class)->active($id);
             $status = ($operation ? Cache::get('usbcloud.status.'.$id) : null) ?? Cache::remember('usbcloud.status.'.$id, 15, fn (): array => [
                 ...$client->status(), 'checked_at' => now()->toIso8601String(),
             ]);
@@ -71,11 +69,11 @@ class UsbCloud
             $state = $status['state'] ?? [];
             $fault = ! $status['online'] ? null : (! ($state['gadget_loaded'] ?? false) ? 'USB detached' : null);
             $lastRun = $runs[0] ?? null;
-            if ($status['online'] && $lastRun && ! $lastRun['success']) {
+            if ($status['online'] && $lastRun && ! $lastRun['success'] && ! isset($lastRun['interrupted'])) {
                 $fault = $lastRun['error'];
             }
             $filesystem = $inventory['filesystem'] ?? $state['inventory']['filesystem'] ?? null;
-            $pending = isset($inventory['files']) ? count(array_filter($deviceFiles, fn (array $file): bool => $file['state'] === 'pending')) : null;
+            $pending = isset($inventory['files']) ? count(array_filter($deviceFiles, fn (array $file): bool => $file['state'] !== 'pulled')) : null;
             $latest = null;
             foreach ($inventory['files'] ?? [] as $entry) {
                 if ($latest === null || ($entry['modified_at'] ?? '') > ($latest['modified_at'] ?? '')) {
@@ -84,16 +82,25 @@ class UsbCloud
             }
             $devices[] = [
                 'id' => $id, 'name' => $connection['name'] ?? $id, 'address' => $connection['host'] ?? config('pi-poc.host'),
-                'status' => $operation === 'pull' ? 'syncing' : (! $status['online'] ? 'offline' : ($fault ? 'fault' : 'online')),
-                'operation' => $operation, 'error' => $status['error'] ?? $fault,
+                'status' => ($operation === 'pull' || $transferring || ($transfer['state'] ?? '') === 'paused') ? 'syncing' : (! $status['online'] ? 'offline' : ($fault ? 'fault' : 'online')),
+                'operation' => $operation, 'transfer' => $transfer, 'config' => array_diff_key($connection, array_flip(['identity', 'host_key_alias', 'directory', 'removed'])),
+                'hostname' => $state['hostname'] ?? null, 'model' => $state['model'] ?? null, 'snapshot' => isset($state['snapshot']) ? array_diff_key($state['snapshot'], ['token' => true]) : null, 'error' => $status['error'] ?? $fault,
                 'gadget_loaded' => $state['gadget_loaded'] ?? null,
                 'usb_state' => implode(', ', $state['usb_state'] ?? []),
                 'firmware' => $state['version'] ?? null, 'uptime_seconds' => $state['uptime_seconds'] ?? null,
                 'filesystem' => $filesystem, 'pending' => $pending,
-                'last_sync' => $lastSync['at'] ?? null, 'scanned_at' => $inventory['at'] ?? null,
+                'next_sync' => Cache::get('usbcloud.next_sync.'.$id), 'last_sync' => $lastSync['at'] ?? null, 'scanned_at' => $inventory['at'] ?? null,
                 'checked_at' => $status['checked_at'],
                 'last_file' => $latest['name'] ?? null,
             ];
+        }
+
+        foreach (app(UsbCloudDevices::class)->all(true) as $id => $connection) {
+            if (! $connection['removed']) {
+                continue;
+            }
+            $client = $this->client($id);
+            $files = array_merge($files, array_filter($this->files($id, $client, []), fn (array $file): bool => $file['state'] === 'pulled'));
         }
 
         return [
@@ -101,7 +108,7 @@ class UsbCloud
             'files' => collect($files)->sortByDesc(fn (array $file): string => $file['modified_at'] ?? $file['saved_at'] ?? '')->values()->all(),
             'logs' => $this->logs($logDevices),
             'settings' => $this->settings(),
-            'server' => ['url' => config('app.url'), 'storage_root' => config('pi-poc.directory'), 'scheduler_last_seen' => Cache::get('usbcloud.scheduler_seen')],
+            'server' => ['ssh_public_key' => File::isFile(config('pi-poc.identity').'.pub') ? trim(File::get(config('pi-poc.identity').'.pub')) : null, 'worker_last_seen' => Cache::get('usbcloud.worker_seen'), 'client_version' => '0.3.1', 'url' => config('app.url'), 'storage_root' => config('pi-poc.directory'), 'scheduler_last_seen' => Cache::get('usbcloud.scheduler_seen')],
         ];
     }
 
@@ -109,7 +116,7 @@ class UsbCloud
     public function allFiles(): array
     {
         $files = [];
-        foreach ($this->connections() as $id => $connection) {
+        foreach (app(UsbCloudDevices::class)->all(true) as $id => $connection) {
             $client = $this->client($id);
             $files = array_merge($files, $this->files($id, $client, $this->read($client->directory().'/inventory.json')));
         }
@@ -152,7 +159,60 @@ class UsbCloud
             ];
         }
 
+        $progress = app(UsbCloudTransfers::class)->progress($id);
+        foreach ($files as &$file) {
+            if ($file['state'] === 'pulled') {
+                continue;
+            }
+            if (($progress['current_file'] ?? null) === $file['name'] && in_array($progress['state'], ['running', 'paused', 'pausing', 'failed'], true)) {
+                $file['state'] = match ($progress['state']) {
+                    'failed' => 'failed', 'paused', 'pausing' => 'paused', default => 'pulling'
+                };
+                $file['progress'] = $progress['current_bytes'] ?? 0;
+                $file['error'] = $progress['error'] ?? null;
+            } elseif (in_array($progress['state'] ?? '', ['queued', 'running', 'pausing'], true)) {
+                $file['state'] = 'queued';
+            }
+        }
+        unset($file);
+        foreach ($files as &$file) {
+            $file['media'] = $file['state'] === 'pulled' && in_array(strtolower(pathinfo($file['name'], PATHINFO_EXTENSION)), ['mp4', 'webm', 'mov', 'm4v'], true) ? $this->media($client, $file) : null;
+        }
+        unset($file);
+
         return array_values($files);
+    }
+
+    /** @param array<string, mixed> $file
+     * @return array<string, mixed>|null
+     */
+    private function media(PiPocClient $client, array $file): ?array
+    {
+        $path = $client->directory().'/media/'.$file['sha256'].'.json';
+        if (File::isFile($path)) {
+            return $this->read($path);
+        }
+        try {
+            $binary = is_executable('/opt/homebrew/bin/ffprobe') ? '/opt/homebrew/bin/ffprobe' : 'ffprobe';
+            $result = Process::timeout(8)->run([$binary, '-v', 'error', '-show_entries', 'format=duration:stream=codec_type,width,height', '-of', 'json', $client->filePath($file['run'] ?? '', $file)]);
+            if ($result->failed()) {
+                return null;
+            }
+            $data = json_decode($result->output(), true, flags: JSON_THROW_ON_ERROR);
+            $stream = null;
+            foreach ($data['streams'] ?? [] as $candidate) {
+                if (($candidate['codec_type'] ?? '') === 'video') {
+                    $stream = $candidate;
+                    break;
+                }
+            }
+            $media = ['duration' => isset($data['format']['duration']) ? (float) $data['format']['duration'] : null, 'width' => $stream['width'] ?? null, 'height' => $stream['height'] ?? null];
+            $this->write($path, $media);
+
+            return $media;
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     /** @return array<string, mixed> */
@@ -168,20 +228,46 @@ class UsbCloud
 
             return ['success' => $status['online'], 'message' => $message];
         }
-        $lock = Cache::lock($client->directory() === config('pi-poc.directory') ? 'pi-poc-retrieval' : 'usbcloud.lock.'.$id, 600);
+        $lock = Cache::lock($client->directory() === config('pi-poc.directory') ? 'pi-poc-retrieval' : 'usbcloud.lock.'.$id, 5500);
         if (! $lock->get()) {
             throw new RuntimeException('A device operation is already running. Wait for it to finish.');
         }
-        Cache::put('usbcloud.operation.'.$id, $action, 600);
+        Cache::put('usbcloud.operation.'.$id, $action, 5500);
+        $transfers = app(UsbCloudTransfers::class);
+        if ($action === 'pull') {
+            $transfers->update($id, ['state' => 'running', 'stage' => 'Connecting', 'error' => null]);
+        }
         $this->log($id, 'info', ucfirst($action).' started.');
         try {
             if (in_array($action, ['scan', 'pull'], true)) {
-                $run = $client->retrieve(function (string $line) use ($id, $output): void {
-                    if (str_starts_with($line, 'Transferring new file:') || str_starts_with($line, 'Skipping already saved:')) {
-                        $this->log($id, 'info', trim($line));
-                        $output?->__invoke(trim($line));
+                $connection = $this->connections()[$id];
+                for ($attempt = 0; ; $attempt++) {
+                    $run = $client->retrieve(function (string $line) use ($id, $output): void {
+                        if (str_starts_with($line, 'Transferring new file:') || str_starts_with($line, 'Skipping already saved:')) {
+                            $this->log($id, 'info', trim($line));
+                            $output?->__invoke(trim($line));
+                        }
+                    }, copy: $action === 'pull', onProgress: $action === 'pull' ? fn (array $progress): array => $transfers->update($id, $progress) : null,
+                        control: $action === 'pull' ? fn (): ?string => Cache::get('usbcloud.control.'.$id) : null);
+                    if ($run['success'] || isset($run['interrupted']) || $attempt >= $connection['retry_count']) {
+                        break;
                     }
-                }, copy: $action === 'pull');
+                    $transfers->update($id, ['stage' => 'Retry in '.$connection['retry_delay'].' s', 'error' => $run['error']]);
+                    for ($second = 0; $second < $connection['retry_delay']; $second++) {
+                        if (Cache::has('usbcloud.control.'.$id)) {
+                            break 2;
+                        }
+                        Sleep::for(1)->seconds();
+                    }
+                }
+                if ($action === 'pull') {
+                    $command = Cache::pull('usbcloud.control.'.$id);
+                    $state = $command === 'pause' ? 'paused' : ($command === 'cancel' ? 'cancelled' : ($run['success'] ? 'completed' : 'failed'));
+                    $transfers->update($id, ['state' => $state, 'stage' => ucfirst($state), 'rate' => 0, 'eta' => null, 'error' => $run['error']]);
+                    if (in_array($state, ['paused', 'cancelled'], true)) {
+                        return ['success' => true, 'message' => ucfirst($state).'. Verified files are saved; resume retrieves the remaining files.'];
+                    }
+                }
                 foreach ($run['log'] as $line) {
                     $this->log($id, 'info', $line);
                 }
@@ -200,6 +286,9 @@ class UsbCloud
 
             return ['success' => true, 'message' => $message];
         } catch (Throwable $exception) {
+            if ($action === 'pull') {
+                $transfers->update($id, ['state' => 'failed', 'stage' => 'Failed', 'error' => $exception->getMessage()]);
+            }
             $this->log($id, 'err', $exception->getMessage());
 
             return ['success' => false, 'message' => $exception->getMessage()];

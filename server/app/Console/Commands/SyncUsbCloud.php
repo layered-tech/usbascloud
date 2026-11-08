@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Services\UsbCloud;
+use App\Services\UsbCloudTransfers;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use RuntimeException;
@@ -17,11 +18,17 @@ class SyncUsbCloud extends Command
     {
         Cache::put('usbcloud.scheduler_seen', now()->toIso8601String(), 120);
         $settings = $cloud->settings();
-        if (! $this->option('force') && (! $settings['auto_pull'] || ! Cache::add('usbcloud.scheduled', true, $settings['pull_interval']))) {
-            return self::SUCCESS;
-        }
         $failed = false;
-        foreach (array_keys($cloud->connections()) as $id) {
+        foreach ($cloud->connections() as $id => $connection) {
+            $enabled = $connection['auto_sync'] ?? $settings['auto_pull'];
+            $interval = $connection['auto_sync'] === null ? $settings['pull_interval'] : $connection['interval'];
+            if (! $this->option('force') && (! $enabled || ! Cache::add('usbcloud.scheduled.'.$id, true, $interval))) {
+                continue;
+            }
+            if (app(UsbCloudTransfers::class)->active($id) || (app(UsbCloudTransfers::class)->progress($id)['state'] ?? '') === 'paused') {
+                continue;
+            }
+            Cache::put('usbcloud.next_sync.'.$id, now()->addSeconds($interval)->toIso8601String(), $interval + 120);
             try {
                 $result = $cloud->operate($id, 'pull');
                 $this->line($id.': '.$result['message']);

@@ -31,6 +31,15 @@ return [
 
     'connections' => [
 
+        'usbcloud' => [
+            'driver' => 'database',
+            'connection' => env('DB_QUEUE_CONNECTION'),
+            'table' => 'jobs',
+            'queue' => 'usbcloud',
+            'retry_after' => 6000,
+            'after_commit' => false,
+        ],
+
         'sync' => [
             'driver' => 'sync',
         ],
@@ -84,6 +93,15 @@ return [
         'failover' => [
             'driver' => 'failover',
             'connections' => [
+
+                'usbcloud' => [
+                    'driver' => 'database',
+                    'connection' => env('DB_QUEUE_CONNECTION'),
+                    'table' => 'jobs',
+                    'queue' => 'usbcloud',
+                    'retry_after' => 6000,
+                    'after_commit' => false,
+                ],
                 'database',
                 'deferred',
             ],

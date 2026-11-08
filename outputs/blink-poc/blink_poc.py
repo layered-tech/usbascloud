@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Hardware client: USB storage and temporary read-only snapshot access over SFTP."""
 import argparse
+import base64
+import shlex
+import sys
 import fcntl
 import hashlib
 import json
@@ -20,7 +23,7 @@ ORIGIN = f'/dev/{VG}/drive'
 SNAP = f'/dev/{VG}/capture'
 EXPORT = Path('/srv/blink-poc/snapshot')
 LEASE = BASE / 'snapshot.json'
-VERSION = '0.2.1'
+VERSION = '0.3.1'
 
 
 def timestamp():
@@ -67,6 +70,7 @@ def device_logs():
 def device_status():
     return {'storage': json.loads(output('lvs', '--reportformat', 'json', '-o', 'lv_name,lv_size,origin,data_percent', VG)),
             'version': VERSION, 'hostname': socket.gethostname(),
+            'model': Path('/proc/device-tree/model').read_text().rstrip('\x00') if Path('/proc/device-tree/model').exists() else None,
             'uptime_seconds': int(float(Path('/proc/uptime').read_text().split()[0])),
             'inventory': read_json(BASE / 'inventory.json'),
             'gadget_loaded': Path('/sys/module/g_mass_storage').exists(),
@@ -150,14 +154,16 @@ def release(token=None, expired_only=False):
     LEASE.unlink(missing_ok=True)
 
 
-def open_snapshot():
+def open_snapshot(timeout=600):
+    if not 60 <= timeout <= 3600:
+        raise ValueError('Snapshot timeout must be between 60 and 3600 seconds')
     attach_pool()
     release(expired_only=True)
     if Path(SNAP).exists() or LEASE.exists():
         raise RuntimeError('Snapshot already open; close it or wait for expiry')
     EXPORT.mkdir(parents=True, exist_ok=True, mode=0o755)
     run('lvcreate', '--snapshot', '-L', '9G', '-n', 'capture', ORIGIN)
-    lease = {'token': secrets.token_hex(16), 'expires_at': time.time() + 600,
+    lease = {'token': secrets.token_hex(16), 'expires_at': time.time() + timeout,
              'path': str(EXPORT), 'loop': None}
     # Persist cleanup state before any optional partition mapping or mount.
     write_json(LEASE, lease)
@@ -213,11 +219,50 @@ def snapshot_manifest(token):
     return inventory
 
 
+def snapshot_read(token, encoded_path):
+    lease = read_json(LEASE)
+    if not lease or not token or not secrets.compare_digest(lease['token'], token):
+        raise RuntimeError('Snapshot token does not match')
+    if lease['expires_at'] <= time.time() or not os.path.ismount(EXPORT):
+        raise RuntimeError('Snapshot is expired or not mounted')
+    name = base64.b64decode(encoded_path, altchars=b'-_', validate=True).decode('utf-8')
+    relative = Path(name)
+    if relative.is_absolute() or not name or any(part in ('', '.', '..') for part in name.split('/')) or any(ord(c) < 32 or ord(c) == 127 or c == chr(92) for c in name):
+        raise RuntimeError('Invalid snapshot path')
+    path = EXPORT / relative
+    path.resolve(strict=True).relative_to(EXPORT.resolve())
+    for part in [path, *path.parents]:
+        if part == EXPORT:
+            break
+        if part.is_symlink():
+            raise RuntimeError('Symlinks cannot be read')
+    with path.open('rb') as source:
+        while chunk := source.read(1024 * 1024):
+            if lease['expires_at'] <= time.time():
+                raise RuntimeError('Snapshot lease expired during transfer')
+            sys.stdout.buffer.write(chunk)
+    sys.stdout.buffer.flush()
+
+
+def serve_ssh():
+    command = shlex.split(os.environ.get('SSH_ORIGINAL_COMMAND', ''))
+    allowed = {'status', 'logs', 'start', 'detach', 'snapshot-open', 'snapshot-close', 'snapshot-manifest', 'snapshot-read'}
+    if len(command) < 4 or command[:3] != ['sudo', '-n', 'blink-poc'] or command[3] not in allowed:
+        raise RuntimeError('This key only permits USBCloud commands')
+    # No shell: argparse validates options and each operation validates its lease.
+    os.execvp('sudo', ['sudo', '-n', '/usr/local/sbin/blink-poc', *command[3:]])
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['init', 'start', 'detach', 'logs', 'snapshot-open', 'snapshot-close', 'snapshot-expire', 'snapshot-manifest', 'status'])
+    parser.add_argument('action', choices=['ssh-serve', 'snapshot-read', 'init', 'start', 'detach', 'logs', 'snapshot-open', 'snapshot-close', 'snapshot-expire', 'snapshot-manifest', 'status'])
     parser.add_argument('--token')
+    parser.add_argument('--path')
+    parser.add_argument('--timeout', type=int, default=600)
     args = parser.parse_args()
+    if args.action == 'ssh-serve':
+        serve_ssh()
+        return
     if os.geteuid() != 0:
         parser.error('Requires root')
     BASE.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -226,6 +271,11 @@ def main():
         return
     if args.action == 'status':
         print(json.dumps(device_status()))
+        return
+    if args.action == 'snapshot-read':
+        if not args.token or not args.path:
+            parser.error('snapshot-read requires --token and --path')
+        snapshot_read(args.token, args.path)
         return
     with (BASE / 'lock').open('w') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
@@ -236,7 +286,7 @@ def main():
         elif args.action == 'detach':
             detach()
         elif args.action == 'snapshot-open':
-            open_snapshot()
+            open_snapshot(args.timeout)
         elif args.action == 'snapshot-close':
             if not args.token:
                 parser.error('snapshot-close requires --token')

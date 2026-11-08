@@ -1,16 +1,21 @@
 <?php
 
+use App\Jobs\PullUsbDevice;
 use App\Services\UsbCloud;
+use App\Services\UsbCloudDevices;
+use App\Services\UsbCloudTransfers;
 use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
     $directory = storage_path('framework/testing/usbcloud-'.Str::uuid());
-    config(['usbcloud.directory' => $directory.'/server', 'pi-poc.directory' => $directory.'/pi']);
+    config(['usbcloud.directory' => $directory.'/server', 'pi-poc.directory' => $directory.'/pi', 'pi-poc.transfer_protocol' => 'sftp']);
 });
 
 afterEach(function () {
@@ -26,6 +31,12 @@ function fakeUsbDevice(array $files = [], bool $corruptTransfer = false): void
             return Process::result();
         }
         $command = end($process->command);
+        if (str_contains($command, 'snapshot-read')) {
+            $description = Process::describe();
+            $description->output = [['type' => 'out', 'buffer' => $corruptTransfer ? 'bad' : 'clip']];
+
+            return $description;
+        }
         if (str_contains($command, 'snapshot-open')) {
             return Process::result(output: json_encode(['token' => str_repeat('a', 32), 'path' => '/srv/blink-poc/snapshot']));
         }
@@ -120,7 +131,7 @@ it('records checksum failures and releases the operation for retry', function ()
 
     expect($result['success'])->toBeFalse();
     expect($result['message'])->toContain('does not match the Pi checksum');
-    expect(app(UsbCloud::class)->dashboard()['files'][0]['state'])->toBe('pending');
+    expect(app(UsbCloud::class)->dashboard()['files'][0]['state'])->toBe('failed');
     expect(Cache::get('usbcloud.operation.BLINK-PI'))->toBeNull();
     Process::assertRan(fn (PendingProcess $process): bool => str_contains(end($process->command), 'snapshot-close'));
     fakeUsbDevice([usbClip()]);
@@ -323,4 +334,177 @@ it('returns 422 for unknown device log subscriptions without contacting any clie
     $this->getJson(route('home', ['log_devices' => ['UNKNOWN-PI']]))->assertUnprocessable()->assertJsonValidationErrors('log_devices.0');
 
     Process::assertNothingRan();
+});
+
+it('queues a background pull once and cancels it before any device access', function () {
+    Queue::fake([PullUsbDevice::class]);
+    Process::fake();
+
+    $this->postJson(route('usbcloud.transfer'), ['action' => 'start', 'device' => 'BLINK-PI'])->assertAccepted()->assertJsonPath('results.BLINK-PI.transfer.state', 'queued');
+    $this->postJson(route('usbcloud.transfer'), ['action' => 'start', 'device' => 'BLINK-PI'])->assertConflict();
+    $progress = app(UsbCloudTransfers::class)->progress('BLINK-PI');
+    $this->postJson(route('usbcloud.transfer'), ['action' => 'cancel', 'device' => 'BLINK-PI'])->assertAccepted()->assertJsonPath('results.BLINK-PI.transfer.state', 'cancelled');
+    (new PullUsbDevice('BLINK-PI', $progress['token']))->handle(app(UsbCloud::class), app(UsbCloudTransfers::class));
+
+    Queue::assertPushed(PullUsbDevice::class, 1);
+    Process::assertNothingRan();
+});
+
+it('pauses after a manifest and closes the snapshot before resuming remaining files', function () {
+    fakeUsbDevice([usbClip()]);
+    app(UsbCloudTransfers::class)->update('BLINK-PI', ['state' => 'running']);
+    Cache::put('usbcloud.control.BLINK-PI', 'pause', 60);
+
+    expect(usbOperation('pull')['success'])->toBeTrue();
+    expect(app(UsbCloudTransfers::class)->progress('BLINK-PI')['state'])->toBe('paused');
+    Process::assertNotRan(fn (PendingProcess $process): bool => $process->command[0] === 'scp');
+    Process::assertRan(fn (PendingProcess $process): bool => str_contains(end($process->command), 'snapshot-close'));
+    Queue::fake([PullUsbDevice::class]);
+
+    $this->postJson(route('usbcloud.transfer'), ['action' => 'resume', 'device' => 'BLINK-PI'])->assertAccepted();
+    $progress = app(UsbCloudTransfers::class)->progress('BLINK-PI');
+    (new PullUsbDevice('BLINK-PI', $progress['token']))->handle(app(UsbCloud::class), app(UsbCloudTransfers::class));
+
+    expect(app(UsbCloudTransfers::class)->progress('BLINK-PI'))->toMatchArray(['state' => 'completed', 'done_files' => 1, 'done_bytes' => 4]);
+    Queue::assertPushed(PullUsbDevice::class, 1);
+});
+
+it('rejects invalid transfer commands and controls without an active transfer', function () {
+    Process::fake();
+
+    $this->postJson(route('usbcloud.transfer'), ['action' => 'pause', 'device' => 'BLINK-PI'])->assertConflict();
+    $this->postJson(route('usbcloud.transfer'), ['action' => 'reboot'])->assertUnprocessable()->assertJsonValidationErrors('action');
+    $this->postJson(route('usbcloud.transfer'), ['action' => 'start', 'device' => '../server'])->assertUnprocessable()->assertJsonValidationErrors('device');
+
+    Process::assertNothingRan();
+});
+
+it('persists device settings and applies port bandwidth snapshot and retry limits', function () {
+    fakeUsbDevice([usbClip()]);
+    $settings = ['name' => 'Garage', 'host' => 'pi-garage.local', 'port' => 2222, 'user' => 'pi', 'site' => 'Garage', 'auto_sync' => false, 'interval' => 300, 'bandwidth' => 0.5, 'snapshot_timeout' => 900, 'retry_count' => 2, 'retry_delay' => 5];
+
+    $this->putJson(route('usbcloud.devices.update', 'BLINK-PI'), [...$settings, 'identity' => '/tmp/untrusted', 'directory' => '/tmp/untrusted'])->assertOk()->assertJsonPath('settings.name', 'Garage');
+    expect(app(UsbCloud::class)->connections()['BLINK-PI'])->toMatchArray($settings);
+    expect(app(UsbCloud::class)->client('BLINK-PI')->directory())->toBe(config('pi-poc.directory'));
+    usbOperation('pull');
+
+    Process::assertRan(fn (PendingProcess $process): bool => str_contains(end($process->command), 'snapshot-open --timeout 900'));
+    Process::assertRan(fn (PendingProcess $process): bool => $process->command[0] === 'scp' && in_array('4000', $process->command, true) && in_array('Port=2222', $process->command, true));
+    $this->putJson(route('usbcloud.devices.update', 'BLINK-PI'), [...$settings, 'host' => 'pi;reboot', 'port' => 0])->assertUnprocessable()->assertJsonValidationErrors(['host', 'port']);
+    expect(app(UsbCloud::class)->connections()['BLINK-PI']['host'])->toBe('pi-garage.local');
+});
+
+it('adds a reachable client and restores it without losing its archive on removal', function () {
+    fakeUsbDevice([usbClip()]);
+    $connection = ['name' => 'Garage', 'host' => 'garage.local', 'port' => 22, 'user' => 'pi'];
+    $response = $this->postJson(route('usbcloud.devices.add'), $connection)->assertCreated();
+    $id = $response->json('device');
+    expect(app(UsbCloud::class)->connections())->toHaveKey($id);
+    usbOperation('pull', $id);
+    $file = collect(app(UsbCloud::class)->allFiles())->firstWhere('device', $id);
+
+    $this->deleteJson(route('usbcloud.devices.remove', $id))->assertOk();
+    expect(app(UsbCloud::class)->connections())->not->toHaveKey($id);
+    $this->get(route('usbcloud.file', $file['id']))->assertOk()->assertDownload('clip.mp4');
+    $this->get(route('home'))->assertOk()->assertInertia(fn (Assert $page) => $page->has('cloud.files', 1));
+    $this->postJson(route('usbcloud.devices.add'), $connection)->assertCreated()->assertJsonPath('device', $id);
+    $this->postJson(route('usbcloud.devices.add'), $connection)->assertUnprocessable()->assertJsonPath('message', 'This address is already in the fleet as '.$id.'.');
+});
+
+it('rejects unreachable pairing without saving a device and prevents removal during a transfer', function () {
+    Process::fake(['*' => Process::result(errorOutput: 'Host key verification failed', exitCode: 255)]);
+
+    $this->postJson(route('usbcloud.devices.add'), ['name' => '', 'host' => 'new.local', 'port' => 22, 'user' => 'pi'])->assertUnprocessable()->assertJsonPath('message', 'Host key verification failed');
+    expect(app(UsbCloud::class)->connections())->toHaveCount(1);
+    app(UsbCloudTransfers::class)->update('BLINK-PI', ['state' => 'running']);
+    $this->deleteJson(route('usbcloud.devices.remove', 'BLINK-PI'))->assertConflict();
+    expect(app(UsbCloud::class)->connections())->toHaveKey('BLINK-PI');
+});
+
+it('tests draft connection settings without persisting them', function () {
+    fakeUsbDevice();
+
+    $this->postJson(route('usbcloud.devices.test', 'BLINK-PI'), ['name' => 'Draft', 'host' => 'draft.local', 'port' => 2222, 'user' => 'pi'])->assertOk()->assertJsonPath('success', true)->assertJsonPath('state.version', '0.2.0');
+    expect(app(UsbCloud::class)->connections()['BLINK-PI']['name'])->toBe('Blink USB storage');
+    Process::assertRan(fn (PendingProcess $process): bool => in_array('pi@draft.local', $process->command, true) && in_array('Port=2222', $process->command, true));
+});
+
+it('discovers service advertisements and marks configured clients as already paired', function () {
+    Process::fake(['*' => Process::result(output: "Garage._usbcloud._tcp.local. IN SRV 0 0 22 garage.local. ; Replace with unicast FQDN of target host\n")]);
+
+    $this->getJson(route('usbcloud.discover'))->assertOk()->assertJsonPath('devices.0.host', 'garage.local')->assertJsonPath('devices.0.port', 22)->assertJsonPath('devices.1.id', 'BLINK-PI');
+
+    Process::assertRanTimes(fn (PendingProcess $process): bool => str_contains(implode(' ', $process->command), '_usbcloud._tcp'), 1);
+});
+
+it('uses per device automatic sync settings independently from server defaults', function () {
+    $this->freezeTime();
+    fakeUsbDevice();
+    app(UsbCloudDevices::class)->save('BLINK-PI', ['auto_sync' => true, 'interval' => 30]);
+
+    $this->artisan('usbcloud:sync')->assertSuccessful();
+    $this->artisan('usbcloud:sync')->assertSuccessful();
+    $this->travel(30)->seconds();
+    $this->artisan('usbcloud:sync')->assertSuccessful();
+
+    Process::assertRanTimes(fn (PendingProcess $process): bool => str_contains(end($process->command), 'snapshot-open'), 2);
+});
+
+it('retries failed transfers under the device policy and leaves unverified data out of the archive', function () {
+    Sleep::fake();
+    fakeUsbDevice([usbClip()], corruptTransfer: true);
+    app(UsbCloudDevices::class)->save('BLINK-PI', ['retry_count' => 1, 'retry_delay' => 5]);
+
+    expect(usbOperation('pull')['success'])->toBeFalse();
+    expect(File::glob(config('pi-poc.directory').'/objects/*'))->toBe([]);
+    expect(app(UsbCloudTransfers::class)->progress('BLINK-PI')['state'])->toBe('failed');
+    Process::assertRanTimes(fn (PendingProcess $process): bool => $process->command[0] === 'scp', 2);
+    Sleep::assertSleptTimes(5);
+});
+
+it('cancels a paused pull without reopening the device snapshot', function () {
+    Process::fake();
+    app(UsbCloudTransfers::class)->update('BLINK-PI', ['state' => 'paused']);
+
+    $this->postJson(route('usbcloud.transfer'), ['action' => 'cancel'])->assertAccepted()->assertJsonPath('results.BLINK-PI.transfer.state', 'cancelled');
+
+    Process::assertNothingRan();
+});
+
+it('extracts clip metadata once and serves video previews with the correct content type', function () {
+    fakeUsbDevice([usbClip()]);
+    usbOperation('pull');
+    Process::fake(function (PendingProcess $process) {
+        return str_contains($process->command[0], 'ffprobe')
+            ? Process::result(output: '{"format":{"duration":"12.5"},"streams":[{"codec_type":"video","width":1920,"height":1080}]}')
+            : Process::result(output: '{"gadget_loaded":true}');
+    });
+    $cloud = app(UsbCloud::class);
+    $file = $cloud->dashboard()['files'][0];
+
+    expect($file['media'])->toBe(['duration' => 12.5, 'width' => 1920, 'height' => 1080]);
+    $cloud->dashboard();
+    $this->get(route('usbcloud.file', ['file' => $file['id'], 'preview' => true]))->assertOk()->assertHeader('Content-Type', 'video/mp4');
+    Process::assertRanTimes(fn (PendingProcess $process): bool => str_contains($process->command[0], 'ffprobe'), 1);
+});
+
+it('streams verified file contents through the restricted client protocol without SFTP access', function () {
+    config(['pi-poc.transfer_protocol' => 'stream']);
+    fakeUsbDevice([usbClip('folder/clip with spaces.mp4')]);
+
+    $result = usbOperation('pull');
+    $this->assertTrue($result['success'], $result['message']);
+    $file = app(UsbCloud::class)->allFiles()[0];
+    $this->get(route('usbcloud.file', $file['id']))->assertOk()->assertDownload('clip with spaces.mp4');
+    expect(File::get(config('pi-poc.directory').'/objects/'.hash('sha256', 'clip')))->toBe('clip');
+    Process::assertNotRan(fn (PendingProcess $process): bool => $process->command[0] === 'scp');
+    Process::assertRan(fn (PendingProcess $process): bool => str_contains(end($process->command), 'snapshot-read --token '.str_repeat('a', 32).' --path '.strtr(base64_encode('folder/clip with spaces.mp4'), '+/', '-_')));
+});
+
+it('matches a discovered hostname to the paired client and keeps one discovery result', function () {
+    Process::fake(['*' => Process::result(output: "USBCloud\\032on\\032blink-pi._usbcloud._tcp SRV 0 0 22 blink-pi.local. ; Replace with unicast FQDN of target host\n")]);
+
+    $this->getJson(route('usbcloud.discover'))->assertOk()->assertJsonCount(1, 'devices')->assertJsonPath('devices.0.id', 'BLINK-PI')->assertJsonPath('devices.0.host', 'blink-pi.local');
+
+    Process::assertRanTimes(fn (PendingProcess $process): bool => str_contains(implode(' ', $process->command), '_usbcloud._tcp'), 1);
 });

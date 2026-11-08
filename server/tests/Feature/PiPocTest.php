@@ -8,6 +8,7 @@ use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
+    config(['pi-poc.transfer_protocol' => 'sftp']);
     config(['pi-poc.directory' => storage_path('framework/testing/pi-poc-'.Str::uuid())]);
 });
 

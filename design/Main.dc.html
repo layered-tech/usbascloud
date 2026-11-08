@@ -15,25 +15,122 @@
 body { margin: 0; }
 .uc-card { width: 100%; }
 a { color: var(--phosphor); text-decoration: none; } a:hover { text-decoration: underline; }
+.uc-spin { display: inline-block; width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 999px; animation: ucspin 0.8s linear infinite; }
+@keyframes ucspin { to { transform: rotate(360deg); } }
+.vf-scan { background: repeating-linear-gradient(0deg, rgba(70, 255, 122, 0.05) 0 1px, transparent 1px 3px); pointer-events: none; }
+.vf-frame { position: relative; background: #060806; border: 1px solid var(--line-strong); overflow: hidden; }
+.vf-seek { position: relative; flex: 1; height: 24px; padding: 0; border: 0; background: transparent; cursor: pointer; display: block; }
+.vf-seek:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.vf-seek .vf-base { position: absolute; left: 0; right: 0; top: 7px; height: 8px; border: 1px solid var(--line-strong); background: var(--surface-sunken); display: block; }
+.vf-seek .vf-avail { position: absolute; left: 1px; top: 8px; height: 8px; background: var(--phosphor-dim); display: block; }
+.vf-seek .vf-played { position: absolute; left: 1px; top: 8px; height: 8px; background: var(--phosphor); display: block; }
+.vf-seek .vf-head { position: absolute; top: 4px; width: 4px; height: 16px; margin-left: -2px; background: var(--ink); display: block; }
+.vf-ctl { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; padding: 0; border: 1px solid transparent; border-radius: 2px; background: transparent; color: var(--ink); cursor: pointer; }
+.vf-ctl:hover { border-color: var(--line-strong); color: var(--phosphor); }
+.vf-ctl:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.vf-ctl svg { width: 16px; height: 16px; display: block; }
+.vf-bigplay { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border: 2px solid #46ff7a; background: rgba(6, 8, 6, 0.72); color: #46ff7a; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.vf-bigplay:hover { background: rgba(70, 255, 122, 0.18); }
+.vf-bigplay:focus-visible { outline: 2px solid #46ff7a; outline-offset: 2px; }
+.vf-bigplay svg { width: 22px; height: 22px; display: block; }
+.vf-switch { position: relative; width: 40px; height: 22px; padding: 0; border: 1px solid var(--line-strong); border-radius: 2px; background: var(--surface-sunken); cursor: pointer; flex: none; }
+.vf-switch .vf-knob { position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; background: var(--ink-muted); display: block; transition: left 120ms, background-color 120ms; }
+.vf-switch[aria-checked="true"] { border-color: var(--phosphor); box-shadow: var(--glow); }
+.vf-switch[aria-checked="true"] .vf-knob { left: 21px; background: var(--phosphor); }
+.vf-switch:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.vf-item { display: flex; gap: 12px; align-items: flex-start; width: 100%; padding: 10px 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); text-align: left; cursor: pointer; font: inherit; box-sizing: border-box; }
+.vf-item:hover { border-color: var(--line-strong); }
+.vf-item:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.vf-tl { display: flex; flex-direction: column; gap: 4px; flex: none; width: 176px; padding: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); text-align: left; cursor: pointer; font: inherit; box-sizing: border-box; }
+.vf-tl:hover { border-color: var(--line-strong); }
+.vf-tl:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.uc-dialog.vf-dialog-wide { width: 720px; }
+.vf-galpage { height: 100vh; }
+.vf-galrow { flex-wrap: nowrap; }
+@media (max-width: 960px) { .vf-galpage { height: auto; } .vf-galrow { flex-wrap: wrap; } .vf-galrow > * { overflow-y: visible; max-height: none; } }
+.vf-ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+* { scrollbar-width: thin; scrollbar-color: var(--line-strong) var(--surface-sunken); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--surface-sunken); }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border: 2px solid var(--surface-sunken); border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: var(--phosphor-dim); }
+::-webkit-scrollbar-corner { background: var(--surface-sunken); }
 </style>
 </helmet>
 <div data-theme="{{theme}}" style="min-height: 100vh; display: flex; flex-wrap: wrap; align-items: stretch; background: var(--surface); color: var(--ink); font-family: var(--font-mono); font-size: 14px; line-height: 22px;">
 
   <div style="flex: 0 0 224px; display: flex; flex-direction: column;">
-    <x-import component-from-global-scope="USBCloud.SideNav" brand="USBCloud" version="v2.4.1" sections="{{nav}}" active="{{screen}}" on-change="{{goTo}}" footer="chris · admin"></x-import>
+    <x-import component-from-global-scope="USBCloud.SideNav" brand="USBCloud" version="v2.4.1" sections="{{nav}}" active="{{navActive}}" on-change="{{goTo}}" footer="chris · admin"></x-import>
   </div>
 
   <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column;">
 
     <sc-if value="{{isDevices}}" hint-placeholder-val="{{yes}}">
       <x-import component-from-global-scope="USBCloud.Toolbar" title="Fleet overview" crumbs="{{crumbsDevices}}">
-        <x-import component-from-global-scope="USBCloud.Button" variant="ghost" icon="search">Find</x-import>
-        <x-import component-from-global-scope="USBCloud.Button" icon="sliders-horizontal">Filter</x-import>
-        <x-import component-from-global-scope="USBCloud.Button" variant="primary" icon="cloud-download">Pull new files</x-import>
+        <x-import component-from-global-scope="USBCloud.Button" variant="ghost" icon="sliders-horizontal" on-click="{{fdev.toggle}}" aria-expanded="{{fdev.open}}">{{fdev.buttonText}}</x-import>
+        <x-import component-from-global-scope="USBCloud.Button" icon="plug" on-click="{{add.openDialog}}">Add device</x-import>
+        <sc-if value="{{pull.idle}}" hint-placeholder-val="{{yes}}">
+          <x-import component-from-global-scope="USBCloud.Button" variant="primary" icon="cloud-download" on-click="{{pull.start}}">Pull new files</x-import>
+        </sc-if>
+        <sc-if value="{{pull.running}}" hint-placeholder-val="{{no}}">
+          <x-import component-from-global-scope="USBCloud.Button" variant="primary" disabled="{{yes}}" aria-live="polite"><span class="uc-spin" aria-hidden="true"></span>{{pull.buttonText}}</x-import>
+        </sc-if>
+        <sc-if value="{{pull.done}}" hint-placeholder-val="{{no}}">
+          <x-import component-from-global-scope="USBCloud.Button" icon="check" on-click="{{pull.dismiss}}">Pull complete</x-import>
+        </sc-if>
       </x-import>
       <x-import component-from-global-scope="USBCloud.Tabs" items="{{deviceTabs}}" active="{{tab}}" on-change="{{setTab}}"></x-import>
 
+      <sc-if value="{{fdev.open}}" hint-placeholder-val="{{no}}">
+        <div style="display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: flex-end; padding: 16px 32px; border-bottom: 1px solid var(--line); background: var(--surface-raised);">
+          <x-import component-from-global-scope="USBCloud.Input" label="Search" prompt="/" placeholder="ID, name, host or address" value="{{fdev.q.v}}" on-change="{{fdev.q.set}}" aria-label="Search devices"></x-import>
+          <x-import component-from-global-scope="USBCloud.Select" label="Site" options="{{fdev.site.options}}" value="{{fdev.site.v}}" on-change="{{fdev.site.set}}"></x-import>
+          <x-import component-from-global-scope="USBCloud.Select" label="Firmware" options="{{fdev.fw.options}}" value="{{fdev.fw.v}}" on-change="{{fdev.fw.set}}"></x-import>
+          <x-import component-from-global-scope="USBCloud.Select" label="Storage" options="{{fdev.storage.options}}" value="{{fdev.storage.v}}" on-change="{{fdev.storage.set}}"></x-import>
+          <x-import component-from-global-scope="USBCloud.Select" label="Pending" options="{{fdev.pending.options}}" value="{{fdev.pending.v}}" on-change="{{fdev.pending.set}}"></x-import>
+          <x-import component-from-global-scope="USBCloud.Select" label="Auto sync" options="{{fdev.auto.options}}" value="{{fdev.auto.v}}" on-change="{{fdev.auto.set}}"></x-import>
+          <x-import component-from-global-scope="USBCloud.Select" label="Sort by" options="{{fdev.sort.options}}" value="{{fdev.sort.v}}" on-change="{{fdev.sort.set}}"></x-import>
+          <sc-if value="{{fdev.active}}" hint-placeholder-val="{{no}}">
+            <x-import component-from-global-scope="USBCloud.Button" variant="ghost" icon="x" on-click="{{fdev.clear}}">Clear</x-import>
+          </sc-if>
+        </div>
+      </sc-if>
+
       <div style="padding: 24px 32px 32px; display: flex; flex-direction: column; gap: 24px;">
+        <sc-if value="{{pull.visible}}" hint-placeholder-val="{{no}}">
+          <section aria-live="polite" style="border: 1px solid var(--line-strong); border-top: 2px solid var(--phosphor); background: var(--surface-raised); padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap;">
+              <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0;">
+                <div class="uc-label" style="color: var(--phosphor);">{{pull.kicker}}</div>
+                <div class="uc-data" style="color: var(--ink);">{{pull.line}}</div>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <sc-if value="{{pull.active}}" hint-placeholder-val="{{no}}">
+                  <x-import component-from-global-scope="USBCloud.Button" size="small" variant="ghost" icon="clock" on-click="{{pull.pause}}">Pause</x-import>
+                </sc-if>
+                <sc-if value="{{pull.paused}}" hint-placeholder-val="{{no}}">
+                  <x-import component-from-global-scope="USBCloud.Button" size="small" variant="primary" icon="cloud-download" on-click="{{pull.resume}}">Resume</x-import>
+                </sc-if>
+                <sc-if value="{{pull.running}}" hint-placeholder-val="{{no}}">
+                  <x-import component-from-global-scope="USBCloud.Button" size="small" icon="x" on-click="{{pull.cancel}}">Cancel</x-import>
+                </sc-if>
+                <sc-if value="{{pull.done}}" hint-placeholder-val="{{no}}">
+                  <x-import component-from-global-scope="USBCloud.Button" size="small" icon="check" on-click="{{pull.dismiss}}">Dismiss</x-import>
+                </sc-if>
+              </div>
+            </div>
+            <x-import component-from-global-scope="USBCloud.Meter" label="Transferred" value="{{pull.doneBytes}}" max="{{pull.totalBytes}}" live="{{pull.active}}" value-text="{{pull.doneText}}" caption="{{pull.totalText}}" segments="{{forty}}"></x-import>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+              <sc-for list="{{pull.devices}}" as="pd" hint-placeholder-count="4">
+                <div class="uc-data" style="display: flex; align-items: center; gap: 8px; padding: 2px 8px; border: 1px solid var(--line); background: var(--surface);">
+                  <span style="font-weight: 600; letter-spacing: 0.04em; color: {{pd.color}};">{{pd.id}}</span>
+                  <span style="color: var(--ink-muted);">{{pd.text}}</span>
+                </div>
+              </sc-for>
+              <div class="uc-data" style="color: var(--ink-faint);">{{pull.skipped}}</div>
+            </div>
+          </section>
+        </sc-if>
 
         <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px;">
           <div style="padding: 16px; border: 1px solid var(--line); background: var(--surface-raised); display: flex; flex-direction: column; gap: 4px;">
@@ -42,9 +139,12 @@ a { color: var(--phosphor); text-decoration: none; } a:hover { text-decoration: 
             <div class="uc-data" style="color: var(--ink-muted);">{{stats.totalLine}}</div>
           </div>
           <div style="padding: 16px; border: 1px solid var(--line); background: var(--surface-raised); display: flex; flex-direction: column; gap: 4px;">
-            <div class="uc-label" style="color: var(--ink-muted);">Syncing</div>
+            <div class="uc-label" style="color: var(--ink-muted);">In flight</div>
             <div style="font-size: 22px; line-height: 28px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--phosphor);">{{stats.syncing}}</div>
             <div class="uc-data" style="color: var(--ink-muted);">{{stats.syncingLine}}</div>
+            <div style="padding-top: 6px;">
+              <x-import component-from-global-scope="USBCloud.Meter" label="Progress" value="{{stats.flightDone}}" max="{{stats.flightTotal}}" live="{{stats.flightLive}}" value-text="{{stats.flightDoneText}}" caption="{{stats.flightTotalText}}"></x-import>
+            </div>
           </div>
           <div style="padding: 16px; border: 1px solid var(--line); background: var(--surface-raised); display: flex; flex-direction: column; gap: 4px;">
             <div class="uc-label" style="color: var(--ink-muted);">Pending files</div>
@@ -60,33 +160,61 @@ a { color: var(--phosphor); text-decoration: none; } a:hover { text-decoration: 
 
         <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;">
           <div style="flex: 999 1 560px; min-width: 0; overflow-x: auto;">
-            <x-import component-from-global-scope="USBCloud.DataTable" caption="{{caption}}" columns="{{deviceColumns}}" rows="{{deviceRows}}" selected-key="{{selected}}" on-select-row="{{selectRow}}" empty-text="0 devices match."></x-import>
+            <x-import component-from-global-scope="USBCloud.DataTable" caption="{{caption}}" columns="{{deviceColumns}}" rows="{{deviceRows}}" selected-key="{{selected}}" on-select-row="{{selectRow}}" empty-text="0 devices match these filters."></x-import>
           </div>
 
           <aside style="flex: 0 0 320px; display: flex; flex-direction: column; gap: 16px;">
             <x-import component-from-global-scope="USBCloud.DeviceCard" device="{{sel.device}}" selected="{{yes}}" actions="{{sel.actions}}"></x-import>
 
+            <sc-if value="{{sel.inProgress}}" hint-placeholder-val="{{yes}}">
+              <section aria-live="polite" style="border: 1px solid var(--line-strong); border-top: 2px solid var(--phosphor); background: var(--surface-raised); padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                  <div class="uc-label" style="color: var(--phosphor);">{{sel.tx.kicker}}</div>
+                  <div class="uc-data" style="color: var(--ink-muted);">{{sel.tx.rate}}</div>
+                </div>
+                <div class="uc-data vf-ellipsis" style="color: var(--ink);" title="{{sel.tx.current}}">{{sel.tx.current}}</div>
+                <x-import component-from-global-scope="USBCloud.Meter" label="This file" value="{{sel.tx.curPct}}" max="{{hundred}}" live="{{sel.tx.live}}" value-text="{{sel.tx.curPctText}}" caption="{{sel.tx.curSize}}"></x-import>
+                <x-import component-from-global-scope="USBCloud.Meter" label="Files" value="{{sel.tx.done}}" max="{{sel.tx.total}}" live="{{sel.tx.live}}" value-text="{{sel.tx.filesText}}" caption="{{sel.tx.bytesText}}"></x-import>
+                <dl class="uc-data" style="margin: 0; display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 4px 12px;">
+                  <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Remaining</dt>
+                  <dd style="margin: 0; color: var(--ink);">{{sel.tx.remaining}}</dd>
+                  <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">ETA</dt>
+                  <dd style="margin: 0; color: var(--ink);">{{sel.tx.eta}}</dd>
+                </dl>
+                <div style="display: flex; gap: 8px; justify-content: flex-end; padding-top: 12px; border-top: 1px solid var(--line);">
+                  <sc-if value="{{sel.tx.live}}" hint-placeholder-val="{{yes}}">
+                    <x-import component-from-global-scope="USBCloud.Button" size="small" variant="ghost" icon="clock" on-click="{{sel.tx.pause}}">Pause</x-import>
+                  </sc-if>
+                  <sc-if value="{{sel.tx.paused}}" hint-placeholder-val="{{no}}">
+                    <x-import component-from-global-scope="USBCloud.Button" size="small" variant="primary" icon="cloud-download" on-click="{{sel.tx.resume}}">Resume</x-import>
+                  </sc-if>
+                  <x-import component-from-global-scope="USBCloud.Button" size="small" icon="x" on-click="{{sel.tx.stop}}">Stop</x-import>
+                </div>
+              </section>
+            </sc-if>
+
             <section style="border: 1px solid var(--line); background: var(--surface-raised); padding: 16px; display: flex; flex-direction: column; gap: 12px;">
               <div class="uc-label" style="color: var(--ink-muted);">Details</div>
               <dl class="uc-data" style="margin: 0; display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 8px 12px;">
-                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Mount</dt>
-                <dd style="margin: 0; color: var(--ink);">{{sel.mount}}</dd>
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Host</dt>
+                <dd class="vf-ellipsis" style="margin: 0; color: var(--ink);" title="{{sel.host}}">{{sel.host}}</dd>
                 <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Address</dt>
                 <dd style="margin: 0; color: var(--ink);">{{sel.addr}}</dd>
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Mount</dt>
+                <dd style="margin: 0; color: var(--ink);">{{sel.mount}}</dd>
                 <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Firmware</dt>
                 <dd style="margin: 0; color: var(--ink);">{{sel.fw}}</dd>
-                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Uptime</dt>
-                <dd style="margin: 0; color: var(--ink);">{{sel.uptime}}</dd>
-                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Filesystem</dt>
-                <dd style="margin: 0; color: var(--ink);">{{sel.fs}}</dd>
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Auto sync</dt>
+                <dd style="margin: 0; color: var(--ink);">{{sel.autoText}}</dd>
                 <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Free</dt>
                 <dd style="margin: 0; color: var(--ink);">{{sel.free}}</dd>
                 <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Last file</dt>
-                <dd style="margin: 0; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{sel.lastFile}}">{{sel.lastFile}}</dd>
+                <dd class="vf-ellipsis" style="margin: 0; color: var(--ink);" title="{{sel.lastFile}}">{{sel.lastFile}}</dd>
               </dl>
-              <div style="display: flex; gap: 8px; justify-content: flex-end; padding-top: 12px; border-top: 1px solid var(--line);">
-                <x-import component-from-global-scope="USBCloud.Button" size="small" variant="ghost" icon="terminal" on-click="{{goLog}}">Show log</x-import>
-                <x-import component-from-global-scope="USBCloud.Button" size="small" icon="folder" on-click="{{goFiles}}">Show files</x-import>
+              <div style="display: flex; gap: 8px; justify-content: flex-end; padding-top: 12px; border-top: 1px solid var(--line); flex-wrap: wrap;">
+                <x-import component-from-global-scope="USBCloud.Button" size="small" variant="ghost" icon="folder" on-click="{{sel.showFiles}}">Files</x-import>
+                <x-import component-from-global-scope="USBCloud.Button" size="small" variant="ghost" icon="terminal" on-click="{{goLog}}">Log</x-import>
+                <x-import component-from-global-scope="USBCloud.Button" size="small" variant="primary" icon="chevron-right" on-click="{{sel.openDevice}}">Open device</x-import>
               </div>
             </section>
 
@@ -96,17 +224,572 @@ a { color: var(--phosphor); text-decoration: none; } a:hover { text-decoration: 
       </div>
     </sc-if>
 
+    <sc-if value="{{isDevice}}" hint-placeholder-val="{{no}}">
+      <x-import component-from-global-scope="USBCloud.Toolbar" title="{{dev.name}}" crumbs="{{dev.crumbs}}">
+        <x-import component-from-global-scope="USBCloud.Button" variant="ghost" on-click="{{dev.back}}">Back to fleet</x-import>
+        <x-import component-from-global-scope="USBCloud.Button" variant="ghost" icon="refresh-cw">Refresh</x-import>
+        <x-import component-from-global-scope="USBCloud.Button" icon="unplug" disabled="{{dev.busy}}">Unmount</x-import>
+        <x-import component-from-global-scope="USBCloud.Button" variant="primary" icon="cloud-download" disabled="{{dev.pullDisabled}}" on-click="{{dev.pullNow}}">{{dev.pullLabel}}</x-import>
+      </x-import>
+      <x-import component-from-global-scope="USBCloud.Tabs" items="{{dev.tabs}}" active="{{dev.tab}}" on-change="{{dev.setTab}}"></x-import>
+
+      <sc-if value="{{dev.isOverview}}" hint-placeholder-val="{{yes}}">
+        <div style="padding: 24px 32px 32px; display: flex; flex-direction: column; gap: 24px;">
+
+          <div style="display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: center; padding: 16px; border: 1px solid var(--line); background: var(--surface-raised);">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span class="uc-data" style="font-weight: 600; letter-spacing: 0.04em; color: var(--phosphor);">{{dev.id}}</span>
+              <x-import component-from-global-scope="USBCloud.StatusBadge" status="{{dev.badgeStatus}}">{{dev.badgeText}}</x-import>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0;">
+              <span class="uc-label" style="color: var(--ink-muted);">Snapshot</span>
+              <span class="uc-data" style="color: var(--ink);">{{dev.snapshotText}}</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0;">
+              <span class="uc-label" style="color: var(--ink-muted);">Auto sync</span>
+              <span class="uc-data" style="color: var(--ink);">{{dev.autoText}}</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0;">
+              <span class="uc-label" style="color: var(--ink-muted);">Last sync</span>
+              <span class="uc-data" style="color: var(--ink);">{{dev.lastSync}}</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0;">
+              <span class="uc-label" style="color: var(--ink-muted);">Connection</span>
+              <span class="uc-data" style="color: var(--ink);">{{dev.connText}}</span>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;">
+            <section style="padding: 16px; border: 1px solid var(--line); background: var(--surface-raised); display: flex; flex-direction: column; gap: 12px;">
+              <div class="uc-label" style="color: var(--ink-muted);">Storage</div>
+              <x-import component-from-global-scope="USBCloud.Meter" label="Used" value="{{dev.usedBytes}}" max="{{dev.totalBytes}}" live="{{dev.inProgress}}" value-text="{{dev.usedText}}" caption="{{dev.totalText}}"></x-import>
+              <dl class="uc-data" style="margin: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 4px 12px;">
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Free</dt>
+                <dd style="margin: 0; color: var(--ink);">{{dev.freeText}}</dd>
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Filesystem</dt>
+                <dd style="margin: 0; color: var(--ink);">{{dev.fs}}</dd>
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Mount</dt>
+                <dd style="margin: 0; color: var(--ink);">{{dev.mount}}</dd>
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Pending</dt>
+                <dd style="margin: 0; color: var(--ink);">{{dev.pendingText}}</dd>
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Last file</dt>
+                <dd class="vf-ellipsis" style="margin: 0; color: var(--ink);" title="{{dev.lastFile}}">{{dev.lastFile}}</dd>
+              </dl>
+            </section>
+
+            <sc-if value="{{dev.inProgress}}" hint-placeholder-val="{{yes}}">
+              <section aria-live="polite" style="padding: 16px; border: 1px solid var(--line-strong); border-top: 2px solid var(--phosphor); background: var(--surface-raised); display: flex; flex-direction: column; gap: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                  <div class="uc-label" style="color: var(--phosphor);">{{dev.tx.kicker}}</div>
+                  <div class="uc-data" style="color: var(--ink-muted);">{{dev.tx.rate}}</div>
+                </div>
+                <div class="uc-data vf-ellipsis" style="color: var(--ink);" title="{{dev.tx.current}}">{{dev.tx.current}}</div>
+                <x-import component-from-global-scope="USBCloud.Meter" label="This file" value="{{dev.tx.curPct}}" max="{{hundred}}" live="{{dev.tx.live}}" value-text="{{dev.tx.curPctText}}" caption="{{dev.tx.curSize}}"></x-import>
+                <x-import component-from-global-scope="USBCloud.Meter" label="Files" value="{{dev.tx.done}}" max="{{dev.tx.total}}" live="{{dev.tx.live}}" value-text="{{dev.tx.filesText}}" caption="{{dev.tx.bytesText}}"></x-import>
+                <dl class="uc-data" style="margin: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 4px 12px;">
+                  <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Remaining</dt>
+                  <dd style="margin: 0; color: var(--ink);">{{dev.tx.remaining}}</dd>
+                  <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">ETA</dt>
+                  <dd style="margin: 0; color: var(--ink);">{{dev.tx.eta}}</dd>
+                </dl>
+                <div style="display: flex; gap: 8px; justify-content: flex-end; padding-top: 12px; border-top: 1px solid var(--line);">
+                  <sc-if value="{{dev.tx.live}}" hint-placeholder-val="{{yes}}">
+                    <x-import component-from-global-scope="USBCloud.Button" size="small" variant="ghost" icon="clock" on-click="{{dev.tx.pause}}">Pause</x-import>
+                  </sc-if>
+                  <sc-if value="{{dev.tx.paused}}" hint-placeholder-val="{{no}}">
+                    <x-import component-from-global-scope="USBCloud.Button" size="small" variant="primary" icon="cloud-download" on-click="{{dev.tx.resume}}">Resume</x-import>
+                  </sc-if>
+                  <x-import component-from-global-scope="USBCloud.Button" size="small" icon="x" on-click="{{dev.tx.stop}}">Stop</x-import>
+                </div>
+              </section>
+            </sc-if>
+            <sc-if value="{{dev.idle}}" hint-placeholder-val="{{no}}">
+              <section style="padding: 16px; border: 1px solid var(--line); background: var(--surface-raised); display: flex; flex-direction: column; gap: 12px;">
+                <div class="uc-label" style="color: var(--ink-muted);">Transfer</div>
+                <div class="uc-data" style="color: var(--ink);">{{dev.idleText}}</div>
+                <dl class="uc-data" style="margin: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 4px 12px;">
+                  <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Next sync</dt>
+                  <dd style="margin: 0; color: var(--ink);">{{dev.nextSyncText}}</dd>
+                  <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Bandwidth</dt>
+                  <dd style="margin: 0; color: var(--ink);">{{dev.bandwidthText}}</dd>
+                  <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Retries</dt>
+                  <dd style="margin: 0; color: var(--ink);">{{dev.retryText}}</dd>
+                </dl>
+              </section>
+            </sc-if>
+
+            <section style="padding: 16px; border: 1px solid var(--line); background: var(--surface-raised); display: flex; flex-direction: column; gap: 12px;">
+              <div class="uc-label" style="color: var(--ink-muted);">Client</div>
+              <dl class="uc-data" style="margin: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 4px 12px;">
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Host</dt>
+                <dd class="vf-ellipsis" style="margin: 0; color: var(--ink);" title="{{dev.host}}">{{dev.host}}</dd>
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Address</dt>
+                <dd style="margin: 0; color: var(--ink);">{{dev.addr}}</dd>
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">SSH</dt>
+                <dd style="margin: 0; color: var(--ink);">{{dev.sshText}}</dd>
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Model</dt>
+                <dd style="margin: 0; color: var(--ink);">{{dev.model}}</dd>
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Agent</dt>
+                <dd style="margin: 0; color: var(--ink);">{{dev.fwText}}</dd>
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Uptime</dt>
+                <dd style="margin: 0; color: var(--ink);">{{dev.uptime}}</dd>
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Site</dt>
+                <dd style="margin: 0; color: var(--ink);">{{dev.site}}</dd>
+              </dl>
+            </section>
+          </div>
+
+          <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;">
+            <div style="flex: 999 1 520px; min-width: 0; overflow-x: auto;">
+              <x-import component-from-global-scope="USBCloud.DataTable" caption="{{dev.recentCaption}}" columns="{{fileColumns}}" rows="{{dev.recentRows}}" row-key="path" on-select-row="{{dev.selectFile}}" empty-text="No files from this device yet."></x-import>
+            </div>
+            <div style="flex: 1 1 400px; min-width: 0;">
+              <x-import component-from-global-scope="USBCloud.LogPane" title="{{dev.logTitle}}" entries="{{dev.logEntries}}" height="{{dev.logHeightSmall}}" follow="{{yes}}" empty-text="0 entries today."></x-import>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{dev.isFiles}}" hint-placeholder-val="{{no}}">
+        <div style="padding: 24px 32px 32px; display: flex; flex-direction: column; gap: 16px;">
+          <div class="uc-data" style="color: var(--ink-muted);">Select a file to open it in the Files view with this device filtered.</div>
+          <div style="overflow-x: auto;">
+            <x-import component-from-global-scope="USBCloud.DataTable" caption="{{dev.filesCaption}}" columns="{{fileColumns}}" rows="{{dev.allRows}}" row-key="path" on-select-row="{{dev.selectFile}}" empty-text="No files from this device yet."></x-import>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{dev.isLog}}" hint-placeholder-val="{{no}}">
+        <div style="padding: 24px 32px 32px; display: flex; flex-direction: column; gap: 16px;">
+          <x-import component-from-global-scope="USBCloud.LogPane" title="{{dev.logTitle}}" entries="{{dev.logEntries}}" height="{{dev.logHeightTall}}" follow="{{yes}}" empty-text="0 entries today."></x-import>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{dev.isSettings}}" hint-placeholder-val="{{no}}">
+        <div style="padding: 24px 32px 32px; display: flex; flex-wrap: wrap; gap: 32px; align-items: flex-start;">
+          <div style="flex: 1 1 520px; max-width: 640px; min-width: 0; display: flex; flex-direction: column; gap: 24px;">
+
+            <section style="display: flex; flex-direction: column; gap: 12px;">
+              <h2 class="uc-heading" style="margin: 0; color: var(--ink);">Identity</h2>
+              <x-import component-from-global-scope="USBCloud.Input" label="Device name" value="{{dev.cfg.name.v}}" on-change="{{dev.cfg.name.set}}" hint="A friendly label, shown everywhere instead of the device ID."></x-import>
+              <div class="uc-data" style="color: var(--ink-muted);">{{dev.idLine}}</div>
+            </section>
+
+            <section style="display: flex; flex-direction: column; gap: 12px;">
+              <h2 class="uc-heading" style="margin: 0; color: var(--ink);">Connection</h2>
+              <x-import component-from-global-scope="USBCloud.Input" label="Pi hostname or IP" prompt="&gt;" value="{{dev.cfg.host.v}}" on-change="{{dev.cfg.host.set}}" hint="mDNS names resolve on the local network; use the IP for routed sites."></x-import>
+              <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+                <x-import component-from-global-scope="USBCloud.Input" label="SSH port" type="number" min="1" max="65535" value="{{dev.cfg.port.v}}" on-change="{{dev.cfg.port.set}}"></x-import>
+                <x-import component-from-global-scope="USBCloud.Input" label="Username" value="{{dev.cfg.user.v}}" on-change="{{dev.cfg.user.set}}" hint="Key-based; the server's key is installed on first pairing."></x-import>
+              </div>
+              <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <sc-if value="{{dev.test.idle}}" hint-placeholder-val="{{yes}}">
+                  <x-import component-from-global-scope="USBCloud.Button" size="small" icon="plug" on-click="{{dev.test.run}}">Test connection</x-import>
+                </sc-if>
+                <sc-if value="{{dev.test.running}}" hint-placeholder-val="{{no}}">
+                  <x-import component-from-global-scope="USBCloud.Button" size="small" disabled="{{yes}}"><span class="uc-spin" aria-hidden="true"></span>Testing…</x-import>
+                </sc-if>
+                <span class="uc-data" aria-live="polite" style="color: {{dev.test.color}};">{{dev.test.text}}</span>
+              </div>
+            </section>
+
+            <section style="display: flex; flex-direction: column; gap: 12px;">
+              <h2 class="uc-heading" style="margin: 0; color: var(--ink);">Sync</h2>
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px; border: 1px solid var(--line); background: var(--surface-raised);">
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                  <span class="uc-label" style="color: var(--ink);">Automatic sync</span>
+                  <span class="uc-data" style="color: var(--ink-muted);">{{dev.cfg.autoSync.text}}</span>
+                </div>
+                <button type="button" role="switch" class="vf-switch" aria-checked="{{dev.cfg.autoSync.v}}" aria-label="Automatic sync" onClick="{{dev.cfg.autoSync.toggle}}"><span class="vf-knob"></span></button>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+                <x-import component-from-global-scope="USBCloud.Select" label="Sync interval" options="{{dev.cfg.interval.options}}" value="{{dev.cfg.interval.v}}" on-change="{{dev.cfg.interval.set}}" disabled="{{dev.cfg.autoSync.off}}"></x-import>
+                <x-import component-from-global-scope="USBCloud.Select" label="Bandwidth limit" options="{{dev.cfg.bandwidth.options}}" value="{{dev.cfg.bandwidth.v}}" on-change="{{dev.cfg.bandwidth.set}}"></x-import>
+              </div>
+              <div class="uc-data" style="color: var(--ink-muted);">{{dev.cfg.syncHint}}</div>
+            </section>
+
+            <section style="display: flex; flex-direction: column; gap: 12px;">
+              <h2 class="uc-heading" style="margin: 0; color: var(--ink);">Snapshot</h2>
+              <x-import component-from-global-scope="USBCloud.Select" label="Snapshot timeout" options="{{dev.cfg.snapshot.options}}" value="{{dev.cfg.snapshot.v}}" on-change="{{dev.cfg.snapshot.set}}"></x-import>
+              <div class="uc-data" style="color: var(--ink-muted);">The server reads from a read-only snapshot of the drive so the attached device keeps writing. A snapshot left open longer than this is closed and the transfer resumes on the next sync.</div>
+            </section>
+
+            <section style="display: flex; flex-direction: column; gap: 12px;">
+              <h2 class="uc-heading" style="margin: 0; color: var(--ink);">Retry policy</h2>
+              <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+                <x-import component-from-global-scope="USBCloud.Input" label="Retry count" type="number" min="0" max="10" value="{{dev.cfg.retryCount.v}}" on-change="{{dev.cfg.retryCount.set}}" hint="0 gives up after the first failure."></x-import>
+                <x-import component-from-global-scope="USBCloud.Select" label="Retry delay" options="{{dev.cfg.retryDelay.options}}" value="{{dev.cfg.retryDelay.v}}" on-change="{{dev.cfg.retryDelay.set}}"></x-import>
+              </div>
+              <div class="uc-data" style="color: var(--ink-muted);">{{dev.cfg.retryHint}}</div>
+            </section>
+
+            <div style="display: flex; gap: 8px; justify-content: space-between; align-items: center; padding-top: 16px; border-top: 1px solid var(--line); flex-wrap: wrap;">
+              <span class="uc-data" aria-live="polite" style="color: {{dev.saveColor}};">{{dev.saveText}}</span>
+              <div style="display: flex; gap: 8px;">
+                <x-import component-from-global-scope="USBCloud.Button" disabled="{{dev.clean}}" on-click="{{dev.discard}}">Discard</x-import>
+                <x-import component-from-global-scope="USBCloud.Button" variant="primary" icon="check" disabled="{{dev.clean}}" on-click="{{dev.save}}">Save settings</x-import>
+              </div>
+            </div>
+          </div>
+
+          <aside style="flex: 0 0 320px; display: flex; flex-direction: column; gap: 16px;">
+            <section style="border: 1px solid var(--line); background: var(--surface-raised); padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+              <div class="uc-label" style="color: var(--ink-muted);">In effect now</div>
+              <dl class="uc-data" style="margin: 0; display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 6px 12px;">
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Auto sync</dt>
+                <dd style="margin: 0; color: var(--ink);">{{dev.autoText}}</dd>
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Next sync</dt>
+                <dd style="margin: 0; color: var(--ink);">{{dev.nextSyncText}}</dd>
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Bandwidth</dt>
+                <dd style="margin: 0; color: var(--ink);">{{dev.bandwidthText}}</dd>
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Snapshot</dt>
+                <dd style="margin: 0; color: var(--ink);">{{dev.snapshotText}}</dd>
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Retries</dt>
+                <dd style="margin: 0; color: var(--ink);">{{dev.retryText}}</dd>
+              </dl>
+              <div class="uc-data" style="color: var(--ink-muted); padding-top: 12px; border-top: 1px solid var(--line);">Changes apply from the next sync; a transfer already running finishes under the old limits.</div>
+            </section>
+            <section style="border: 1px solid var(--line); background: var(--surface-raised); padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+              <div class="uc-label" style="color: var(--ink-muted);">Remove</div>
+              <div class="uc-data" style="color: var(--ink-muted);">Takes the device out of the fleet. Pulled files stay on the server; the device itself is left running.</div>
+              <div style="display: flex; justify-content: flex-end;">
+                <x-import component-from-global-scope="USBCloud.Button" size="small" variant="inverse" icon="trash-2" on-click="{{dev.openRemove}}">Remove device</x-import>
+              </div>
+            </section>
+          </aside>
+        </div>
+      </sc-if>
+
+      <x-import component-from-global-scope="USBCloud.Dialog" open="{{dev.removeOpen}}" destructive="{{yes}}" kicker="Remove device" title="{{dev.removeTitle}}" on-close="{{dev.removeClose}}" actions="{{dev.removeActions}}" id="remove">
+        <p>{{dev.removeBody}}</p>
+        <p>Files already pulled stay on the server. Nothing on the device is changed, and it can be added again by address.</p>
+      </x-import>
+    </sc-if>
+
     <sc-if value="{{isFiles}}" hint-placeholder-val="{{no}}">
       <x-import component-from-global-scope="USBCloud.Toolbar" title="Files" crumbs="{{crumbsFiles}}">
-        <x-import component-from-global-scope="USBCloud.Input" prompt="/" placeholder="Filter by name or device" aria-label="Filter files"></x-import>
-        <x-import component-from-global-scope="USBCloud.Button" icon="download">Download selected</x-import>
-        <x-import component-from-global-scope="USBCloud.Button" variant="primary" icon="cloud-download">Pull pending</x-import>
+        <x-import component-from-global-scope="USBCloud.Button" variant="ghost" icon="sliders-horizontal" on-click="{{ffiles.toggle}}" aria-expanded="{{ffiles.open}}">{{ffiles.buttonText}}</x-import>
+        <x-import component-from-global-scope="USBCloud.Button" icon="download" disabled="{{file.cantDownload}}">Download selected</x-import>
+        <sc-if value="{{pull.idle}}" hint-placeholder-val="{{yes}}">
+          <x-import component-from-global-scope="USBCloud.Button" variant="primary" icon="cloud-download" on-click="{{pull.start}}">Pull new files</x-import>
+        </sc-if>
+        <sc-if value="{{pull.running}}" hint-placeholder-val="{{no}}">
+          <x-import component-from-global-scope="USBCloud.Button" variant="primary" disabled="{{yes}}" aria-live="polite"><span class="uc-spin" aria-hidden="true"></span>{{pull.buttonText}}</x-import>
+        </sc-if>
+        <sc-if value="{{pull.done}}" hint-placeholder-val="{{no}}">
+          <x-import component-from-global-scope="USBCloud.Button" icon="check" on-click="{{pull.dismiss}}">Pull complete</x-import>
+        </sc-if>
       </x-import>
       <x-import component-from-global-scope="USBCloud.Tabs" items="{{fileTabs}}" active="{{fileTab}}" on-change="{{setFileTab}}"></x-import>
-      <div style="padding: 24px 32px 32px; display: flex; flex-direction: column; gap: 24px;">
-        <div style="overflow-x: auto;">
-          <x-import component-from-global-scope="USBCloud.DataTable" caption="{{fileCaption}}" columns="{{fileColumns}}" rows="{{fileRows}}" row-key="path" selected-key="{{selectedFile}}" on-select-row="{{selectFile}}" empty-text="0 files match."></x-import>
+
+      <sc-if value="{{ffiles.open}}" hint-placeholder-val="{{no}}">
+        <div style="display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: flex-end; padding: 16px 32px; border-bottom: 1px solid var(--line); background: var(--surface-raised);">
+          <x-import component-from-global-scope="USBCloud.Input" label="Search" prompt="/" placeholder="File name or path" value="{{ffiles.q.v}}" on-change="{{ffiles.q.set}}" aria-label="Search files"></x-import>
+          <x-import component-from-global-scope="USBCloud.Select" label="Device" options="{{ffiles.device.options}}" value="{{ffiles.device.v}}" on-change="{{ffiles.device.set}}"></x-import>
+          <x-import component-from-global-scope="USBCloud.Select" label="Type" options="{{ffiles.type.options}}" value="{{ffiles.type.v}}" on-change="{{ffiles.type.set}}"></x-import>
+          <x-import component-from-global-scope="USBCloud.Select" label="Modified" options="{{ffiles.date.options}}" value="{{ffiles.date.v}}" on-change="{{ffiles.date.set}}"></x-import>
+          <x-import component-from-global-scope="USBCloud.Select" label="Size" options="{{ffiles.size.options}}" value="{{ffiles.size.v}}" on-change="{{ffiles.size.set}}"></x-import>
+          <x-import component-from-global-scope="USBCloud.Select" label="Sort by" options="{{ffiles.sort.options}}" value="{{ffiles.sort.v}}" on-change="{{ffiles.sort.set}}"></x-import>
+          <sc-if value="{{ffiles.active}}" hint-placeholder-val="{{no}}">
+            <x-import component-from-global-scope="USBCloud.Button" variant="ghost" icon="x" on-click="{{ffiles.clear}}">Clear</x-import>
+          </sc-if>
         </div>
+      </sc-if>
+
+      <div style="padding: 24px 32px 32px; display: flex; flex-direction: column; gap: 24px;">
+        <sc-if value="{{pull.visible}}" hint-placeholder-val="{{no}}">
+          <section aria-live="polite" style="border: 1px solid var(--line-strong); border-top: 2px solid var(--phosphor); background: var(--surface-raised); padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap;">
+              <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0;">
+                <div class="uc-label" style="color: var(--phosphor);">{{pull.kicker}}</div>
+                <div class="uc-data" style="color: var(--ink);">{{pull.line}}</div>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <sc-if value="{{pull.active}}" hint-placeholder-val="{{no}}">
+                  <x-import component-from-global-scope="USBCloud.Button" size="small" variant="ghost" icon="clock" on-click="{{pull.pause}}">Pause</x-import>
+                </sc-if>
+                <sc-if value="{{pull.paused}}" hint-placeholder-val="{{no}}">
+                  <x-import component-from-global-scope="USBCloud.Button" size="small" variant="primary" icon="cloud-download" on-click="{{pull.resume}}">Resume</x-import>
+                </sc-if>
+                <sc-if value="{{pull.running}}" hint-placeholder-val="{{no}}">
+                  <x-import component-from-global-scope="USBCloud.Button" size="small" icon="x" on-click="{{pull.cancel}}">Cancel</x-import>
+                </sc-if>
+                <sc-if value="{{pull.done}}" hint-placeholder-val="{{no}}">
+                  <x-import component-from-global-scope="USBCloud.Button" size="small" icon="check" on-click="{{pull.dismiss}}">Dismiss</x-import>
+                </sc-if>
+              </div>
+            </div>
+            <x-import component-from-global-scope="USBCloud.Meter" label="Transferred" value="{{pull.doneBytes}}" max="{{pull.totalBytes}}" live="{{pull.active}}" value-text="{{pull.doneText}}" caption="{{pull.totalText}}" segments="{{forty}}"></x-import>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+              <sc-for list="{{pull.devices}}" as="pd" hint-placeholder-count="4">
+                <div class="uc-data" style="display: flex; align-items: center; gap: 8px; padding: 2px 8px; border: 1px solid var(--line); background: var(--surface);">
+                  <span style="font-weight: 600; letter-spacing: 0.04em; color: {{pd.color}};">{{pd.id}}</span>
+                  <span style="color: var(--ink-muted);">{{pd.text}}</span>
+                </div>
+              </sc-for>
+              <div class="uc-data" style="color: var(--ink-faint);">{{pull.skipped}}</div>
+            </div>
+          </section>
+        </sc-if>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;">
+          <div style="flex: 999 1 520px; min-width: 0; overflow-x: auto;">
+            <x-import component-from-global-scope="USBCloud.DataTable" caption="{{fileCaption}}" columns="{{fileColumns}}" rows="{{fileRows}}" row-key="path" selected-key="{{selectedFile}}" on-select-row="{{selectFile}}" empty-text="0 files match these filters."></x-import>
+          </div>
+
+          <sc-if value="{{file.open}}" hint-placeholder-val="{{yes}}">
+            <aside aria-label="File preview" style="flex: 0 0 400px; min-width: 0; display: flex; flex-direction: column; gap: 16px;">
+              <section style="border: 1px solid var(--line-strong); background: var(--surface-raised); padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+                  <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+                    <div class="uc-label" style="color: var(--ink-muted);">{{file.kicker}}</div>
+                    <h2 class="uc-heading vf-ellipsis" style="margin: 0; color: var(--ink);" title="{{file.name}}">{{file.name}}</h2>
+                    <div class="uc-data" style="color: var(--ink-muted);">{{file.metaLine}}</div>
+                  </div>
+                  <x-import component-from-global-scope="USBCloud.Button" size="small" variant="ghost" icon="x" aria-label="Close preview" on-click="{{file.close}}">Close</x-import>
+                </div>
+
+                <sc-if value="{{file.isVideo}}" hint-placeholder-val="{{yes}}">
+                  <div class="vf-frame" style="height: 207px;">
+                    <div class="vf-scan" aria-hidden="true" style="position: absolute; inset: 0;"></div>
+                    <div class="uc-label" style="position: absolute; top: 8px; left: 12px; color: #c8f2cc;">{{file.overlayLeft}}</div>
+                    <div class="uc-data" style="position: absolute; top: 8px; right: 12px; color: #c8f2cc; font-variant-numeric: tabular-nums;">{{player.timecode}}</div>
+                    <sc-if value="{{player.showBigPlay}}" hint-placeholder-val="{{yes}}">
+                      <button type="button" class="vf-bigplay" aria-label="Play" onClick="{{player.toggle}}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z"></path></svg></button>
+                    </sc-if>
+                    <sc-if value="{{player.unavailable}}" hint-placeholder-val="{{no}}">
+                      <div class="uc-data" style="position: absolute; left: 0; right: 0; top: 50%; margin-top: -11px; text-align: center; color: #72ab7b;">{{player.unavailableText}}</div>
+                    </sc-if>
+                    <sc-if value="{{player.stalled}}" hint-placeholder-val="{{no}}">
+                      <div class="uc-data" style="position: absolute; left: 12px; bottom: 8px; color: #c8f2cc; background: rgba(6, 8, 6, 0.85); padding: 0 6px;">{{player.stallText}}</div>
+                    </sc-if>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{file.isAudio}}" hint-placeholder-val="{{no}}">
+                  <div style="position: relative; height: 120px; border: 1px solid var(--line-strong); background: var(--surface-sunken); display: flex; align-items: center; gap: 2px; padding: 0 12px; box-sizing: border-box; overflow: hidden;">
+                    <sc-for list="{{player.bars}}" as="bar" hint-placeholder-count="64">
+                      <span style="flex: 1; display: block; height: {{bar.h}}px; background: {{bar.color}};"></span>
+                    </sc-for>
+                    <sc-if value="{{player.unavailable}}" hint-placeholder-val="{{no}}">
+                      <div class="uc-data" style="position: absolute; left: 0; right: 0; top: 50%; margin-top: -11px; text-align: center; color: var(--ink-muted); background: var(--surface-sunken);">{{player.unavailableText}}</div>
+                    </sc-if>
+                    <sc-if value="{{player.stalled}}" hint-placeholder-val="{{no}}">
+                      <div class="uc-data" style="position: absolute; left: 12px; bottom: 4px; color: var(--ink); background: var(--surface-sunken); padding: 0 6px;">{{player.stallText}}</div>
+                    </sc-if>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{file.hasTransport}}" hint-placeholder-val="{{yes}}">
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <button type="button" class="vf-ctl" aria-label="{{player.toggleLabel}}" onClick="{{player.toggle}}">
+                      <sc-if value="{{player.isPlaying}}" hint-placeholder-val="{{no}}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg></sc-if>
+                      <sc-if value="{{player.notPlaying}}" hint-placeholder-val="{{yes}}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z"></path></svg></sc-if>
+                    </button>
+                    <button type="button" class="vf-ctl uc-label" aria-label="Back 10 seconds" onClick="{{player.back}}" style="width: auto; padding: 0 6px;">−10</button>
+                    <button type="button" class="vf-ctl uc-label" aria-label="Forward 10 seconds" onClick="{{player.fwd}}" style="width: auto; padding: 0 6px;">+10</button>
+                    <span class="uc-data" style="color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap;">{{player.timeText}}</span>
+                    <button type="button" class="vf-seek" aria-label="{{player.seekLabel}}" onClick="{{player.seek}}">
+                      <span class="vf-base"></span>
+                      <span class="vf-avail" style="width: {{player.availPct}}%;"></span>
+                      <span class="vf-played" style="width: {{player.playedPct}}%;"></span>
+                      <span class="vf-head" style="left: {{player.playedPct}}%;"></span>
+                    </button>
+                    <button type="button" class="vf-ctl" aria-label="{{player.muteLabel}}" onClick="{{player.mute}}">
+                      <sc-if value="{{player.muted}}" hint-placeholder-val="{{no}}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"></path><path d="m22 9-6 6"></path><path d="m16 9 6 6"></path></svg></sc-if>
+                      <sc-if value="{{player.notMuted}}" hint-placeholder-val="{{yes}}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7"></path><path d="M18.5 5.5a9 9 0 0 1 0 13"></path></svg></sc-if>
+                    </button>
+                  </div>
+                  <div class="uc-data" style="color: var(--ink-muted);">{{player.availText}}</div>
+                </sc-if>
+
+                <sc-if value="{{file.isImage}}" hint-placeholder-val="{{no}}">
+                  <div style="position: relative; height: 276px; border: 1px solid var(--line-strong); background: var(--surface-sunken); overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;">
+                    <div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 0; height: {{player.availPct}}%; background: var(--phosphor-soft);"></div>
+                    <div class="vf-scan" aria-hidden="true" style="position: absolute; inset: 0;"></div>
+                    <div class="uc-label" style="position: relative; color: var(--ink-muted);">{{file.dims}}</div>
+                    <div class="uc-data" style="position: relative; color: var(--ink);">{{player.imageText}}</div>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{file.isOther}}" hint-placeholder-val="{{no}}">
+                  <div class="uc-data" style="padding: 24px 16px; border: 1px dashed var(--line-strong); color: var(--ink-muted); text-align: center;">{{file.noPreview}}</div>
+                </sc-if>
+
+                <dl class="uc-data" style="margin: 0; display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 8px 12px; padding-top: 12px; border-top: 1px solid var(--line);">
+                  <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">State</dt>
+                  <dd style="margin: 0; color: var(--ink);">{{file.stateText}}</dd>
+                  <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Device</dt>
+                  <dd style="margin: 0; color: var(--ink);">{{file.deviceLine}}</dd>
+                  <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Path</dt>
+                  <dd class="vf-ellipsis" style="margin: 0; color: var(--ink);" title="{{file.path}}">{{file.path}}</dd>
+                  <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Size</dt>
+                  <dd style="margin: 0; color: var(--ink);">{{file.size}}</dd>
+                  <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Modified</dt>
+                  <dd style="margin: 0; color: var(--ink);">{{file.modifiedFull}}</dd>
+                  <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">{{file.extraLabel}}</dt>
+                  <dd style="margin: 0; color: var(--ink);">{{file.extraValue}}</dd>
+                </dl>
+                <div style="display: flex; gap: 8px; justify-content: flex-end; padding-top: 12px; border-top: 1px solid var(--line); flex-wrap: wrap;">
+                  <x-import component-from-global-scope="USBCloud.Button" size="small" variant="ghost" icon="hard-drive" on-click="{{file.openDevice}}">Device</x-import>
+                  <sc-if value="{{file.isVideo}}" hint-placeholder-val="{{yes}}">
+                    <x-import component-from-global-scope="USBCloud.Button" size="small" variant="ghost" icon="chevron-right" on-click="{{file.openGallery}}">Gallery</x-import>
+                  </sc-if>
+                  <sc-if value="{{file.canPull}}" hint-placeholder-val="{{no}}">
+                    <x-import component-from-global-scope="USBCloud.Button" size="small" icon="cloud-download" on-click="{{pull.start}}">Pull this file</x-import>
+                  </sc-if>
+                  <x-import component-from-global-scope="USBCloud.Button" size="small" variant="primary" icon="download" disabled="{{file.cantDownload}}">Download</x-import>
+                </div>
+              </section>
+            </aside>
+          </sc-if>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isGallery}}" hint-placeholder-val="{{no}}">
+      <div class="vf-galpage" style="min-height: 0; display: flex; flex-direction: column;">
+      <x-import component-from-global-scope="USBCloud.Toolbar" title="Gallery" crumbs="{{crumbsGallery}}">
+        <x-import component-from-global-scope="USBCloud.Button" variant="ghost" icon="sliders-horizontal" on-click="{{fgal.toggle}}" aria-expanded="{{fgal.open}}">{{fgal.buttonText}}</x-import>
+        <x-import component-from-global-scope="USBCloud.Button" icon="download" disabled="{{gal.cantDownload}}">Download clip</x-import>
+      </x-import>
+
+      <sc-if value="{{fgal.open}}" hint-placeholder-val="{{no}}">
+        <div style="display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: flex-end; padding: 16px 32px; border-bottom: 1px solid var(--line); background: var(--surface-raised);">
+          <x-import component-from-global-scope="USBCloud.Input" label="Search" prompt="/" placeholder="Clip name" value="{{fgal.q.v}}" on-change="{{fgal.q.set}}" aria-label="Search clips"></x-import>
+          <x-import component-from-global-scope="USBCloud.Select" label="Device" options="{{fgal.device.options}}" value="{{fgal.device.v}}" on-change="{{fgal.device.set}}"></x-import>
+          <x-import component-from-global-scope="USBCloud.Select" label="Recorded" options="{{fgal.date.options}}" value="{{fgal.date.v}}" on-change="{{fgal.date.set}}"></x-import>
+          <x-import component-from-global-scope="USBCloud.Select" label="Length" options="{{fgal.duration.options}}" value="{{fgal.duration.v}}" on-change="{{fgal.duration.set}}"></x-import>
+          <x-import component-from-global-scope="USBCloud.Select" label="State" options="{{fgal.state.options}}" value="{{fgal.state.v}}" on-change="{{fgal.state.set}}"></x-import>
+          <x-import component-from-global-scope="USBCloud.Select" label="Sort by" options="{{fgal.sort.options}}" value="{{fgal.sort.v}}" on-change="{{fgal.sort.set}}"></x-import>
+          <sc-if value="{{fgal.active}}" hint-placeholder-val="{{no}}">
+            <x-import component-from-global-scope="USBCloud.Button" variant="ghost" icon="x" on-click="{{fgal.clear}}">Clear</x-import>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <div style="flex: 1; min-height: 0; padding: 24px 32px 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 24px;">
+        <div class="vf-galrow" style="flex: 1; min-height: 0; display: flex; gap: 24px; align-items: stretch;">
+
+          <aside aria-label="Clips" style="flex: 0 0 288px; min-width: 0; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 8px;">
+            <div class="uc-label" style="color: var(--ink-muted);">{{gal.caption}}</div>
+            <sc-if value="{{gal.listEmpty}}" hint-placeholder-val="{{no}}">
+              <div class="uc-data" style="padding: 24px 16px; border: 1px dashed var(--line-strong); color: var(--ink-muted); text-align: center;">0 clips match these filters.</div>
+            </sc-if>
+            <sc-for list="{{gal.items}}" as="it" hint-placeholder-count="6">
+              <button type="button" class="vf-item" id="{{it.domId}}" aria-pressed="{{it.current}}" onClick="{{it.pick}}" style="border-color: {{it.border}}; background: {{it.bg}};">
+                <span class="vf-frame" style="width: 72px; height: 40px; flex: none; border-color: var(--line);">
+                  <span class="vf-scan" aria-hidden="true" style="position: absolute; inset: 0;"></span>
+                  <span class="uc-label" style="position: absolute; right: 4px; bottom: 2px; color: #c8f2cc; font-size: 9px; letter-spacing: 0.06em;">{{it.dur}}</span>
+                </span>
+                <span style="display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1;">
+                  <span class="uc-data vf-ellipsis" style="font-weight: 600; color: {{it.nameColor}};">{{it.name}}</span>
+                  <span class="uc-data vf-ellipsis" style="color: var(--ink-muted);">{{it.meta}}</span>
+                  <span class="uc-label" style="color: {{it.stateColor}};">{{it.stateText}}</span>
+                </span>
+              </button>
+            </sc-for>
+          </aside>
+
+          <div style="flex: 999 1 480px; min-width: 0; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;">
+            <sc-if value="{{gal.has}}" hint-placeholder-val="{{yes}}">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap;">
+                <div style="display: flex; flex-direction: column; gap: 0; min-width: 0;">
+                  <span class="uc-label" style="color: var(--ink-muted);">{{gal.cur.kicker}}</span>
+                  <h2 class="uc-heading vf-ellipsis" style="margin: 0; color: var(--ink);" title="{{gal.cur.name}}">{{gal.cur.name}}</h2>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                  <x-import component-from-global-scope="USBCloud.Button" size="small" variant="ghost" disabled="{{gal.prevDisabled}}" on-click="{{gal.prev}}" aria-label="Previous clip">Prev</x-import>
+                  <x-import component-from-global-scope="USBCloud.Button" size="small" variant="ghost" icon="chevron-right" disabled="{{gal.nextDisabled}}" on-click="{{gal.next}}" aria-label="Next clip">Next</x-import>
+                </div>
+              </div>
+              <div class="vf-frame" style="aspect-ratio: 16 / 9; width: 100%; box-sizing: border-box;">
+                <div class="vf-scan" aria-hidden="true" style="position: absolute; inset: 0;"></div>
+                <div class="uc-label" style="position: absolute; top: 12px; left: 16px; color: #c8f2cc;">{{gal.cur.overlayLeft}}</div>
+                <div class="uc-data" style="position: absolute; top: 12px; right: 16px; color: #c8f2cc; font-variant-numeric: tabular-nums;">{{gal.player.timecode}}</div>
+                <div class="uc-label" style="position: absolute; bottom: 12px; right: 16px; color: #72ab7b;">{{gal.cur.resLine}}</div>
+                <sc-if value="{{gal.player.showBigPlay}}" hint-placeholder-val="{{yes}}">
+                  <button type="button" class="vf-bigplay" aria-label="Play" onClick="{{gal.player.toggle}}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z"></path></svg></button>
+                </sc-if>
+                <sc-if value="{{gal.player.unavailable}}" hint-placeholder-val="{{no}}">
+                  <div class="uc-data" style="position: absolute; left: 0; right: 0; top: 50%; margin-top: -11px; text-align: center; color: #72ab7b;">{{gal.player.unavailableText}}</div>
+                </sc-if>
+                <sc-if value="{{gal.player.stalled}}" hint-placeholder-val="{{no}}">
+                  <div class="uc-data" style="position: absolute; left: 16px; bottom: 12px; color: #c8f2cc; background: rgba(6, 8, 6, 0.85); padding: 0 6px;">{{gal.player.stallText}}</div>
+                </sc-if>
+              </div>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <button type="button" class="vf-ctl" aria-label="{{gal.player.toggleLabel}}" onClick="{{gal.player.toggle}}">
+                  <sc-if value="{{gal.player.isPlaying}}" hint-placeholder-val="{{no}}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg></sc-if>
+                  <sc-if value="{{gal.player.notPlaying}}" hint-placeholder-val="{{yes}}"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z"></path></svg></sc-if>
+                </button>
+                <button type="button" class="vf-ctl uc-label" aria-label="Back 10 seconds" onClick="{{gal.player.back}}" style="width: auto; padding: 0 6px;">−10</button>
+                <button type="button" class="vf-ctl uc-label" aria-label="Forward 10 seconds" onClick="{{gal.player.fwd}}" style="width: auto; padding: 0 6px;">+10</button>
+                <span class="uc-data" style="color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap;">{{gal.player.timeText}}</span>
+                <button type="button" class="vf-seek" aria-label="{{gal.player.seekLabel}}" onClick="{{gal.player.seek}}">
+                  <span class="vf-base"></span>
+                  <span class="vf-avail" style="width: {{gal.player.availPct}}%;"></span>
+                  <span class="vf-played" style="width: {{gal.player.playedPct}}%;"></span>
+                  <span class="vf-head" style="left: {{gal.player.playedPct}}%;"></span>
+                </button>
+                <button type="button" class="vf-ctl" aria-label="{{gal.player.muteLabel}}" onClick="{{gal.player.mute}}">
+                  <sc-if value="{{gal.player.muted}}" hint-placeholder-val="{{no}}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"></path><path d="m22 9-6 6"></path><path d="m16 9 6 6"></path></svg></sc-if>
+                  <sc-if value="{{gal.player.notMuted}}" hint-placeholder-val="{{yes}}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7"></path><path d="M18.5 5.5a9 9 0 0 1 0 13"></path></svg></sc-if>
+                </button>
+              </div>
+              <div class="uc-data" style="color: var(--ink-muted);">{{gal.player.availText}}</div>
+            </sc-if>
+            <sc-if value="{{gal.none}}" hint-placeholder-val="{{no}}">
+              <div class="vf-frame" style="aspect-ratio: 16 / 9; width: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: center;">
+                <div class="uc-data" style="color: #72ab7b;">No clip selected.</div>
+              </div>
+            </sc-if>
+          </div>
+
+          <aside aria-label="Clip details" style="flex: 0 0 320px; min-width: 0; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;">
+            <sc-if value="{{gal.has}}" hint-placeholder-val="{{yes}}">
+              <section style="border: 1px solid var(--line); background: var(--surface-raised); padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+                  <div class="uc-label" style="color: var(--ink-muted);">Details</div>
+                  <x-import component-from-global-scope="USBCloud.StatusBadge" status="{{gal.cur.badgeStatus}}">{{gal.cur.badgeText}}</x-import>
+                </div>
+                <dl class="uc-data" style="margin: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 8px 12px;">
+                  <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Device</dt>
+                  <dd style="margin: 0; color: var(--ink);">{{gal.cur.deviceLine}}</dd>
+                  <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Recorded</dt>
+                  <dd style="margin: 0; color: var(--ink);">{{gal.cur.recorded}}</dd>
+                  <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Duration</dt>
+                  <dd style="margin: 0; color: var(--ink);">{{gal.cur.duration}}</dd>
+                  <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Video</dt>
+                  <dd style="margin: 0; color: var(--ink);">{{gal.cur.video}}</dd>
+                  <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Size</dt>
+                  <dd style="margin: 0; color: var(--ink);">{{gal.cur.size}}</dd>
+                  <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Path</dt>
+                  <dd class="vf-ellipsis" style="margin: 0; color: var(--ink);" title="{{gal.cur.path}}">{{gal.cur.path}}</dd>
+                  <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">On server</dt>
+                  <dd class="vf-ellipsis" style="margin: 0; color: var(--ink);" title="{{gal.cur.serverPath}}">{{gal.cur.serverPath}}</dd>
+                </dl>
+                <div style="display: flex; gap: 8px; justify-content: flex-end; padding-top: 12px; border-top: 1px solid var(--line); flex-wrap: wrap;">
+                  <x-import component-from-global-scope="USBCloud.Button" size="small" variant="ghost" icon="hard-drive" on-click="{{gal.cur.openDevice}}">Device</x-import>
+                  <x-import component-from-global-scope="USBCloud.Button" size="small" variant="ghost" icon="folder" on-click="{{gal.cur.openFiles}}">In files</x-import>
+                  <sc-if value="{{gal.cur.canPull}}" hint-placeholder-val="{{no}}">
+                    <x-import component-from-global-scope="USBCloud.Button" size="small" icon="cloud-download" on-click="{{pull.start}}">Pull</x-import>
+                  </sc-if>
+                  <x-import component-from-global-scope="USBCloud.Button" size="small" variant="primary" icon="download" disabled="{{gal.cantDownload}}">Download</x-import>
+                </div>
+              </section>
+              <section style="border: 1px solid var(--line); background: var(--surface-raised); padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+                <div class="uc-label" style="color: var(--ink-muted);">Source device</div>
+                <div class="uc-data" style="color: var(--ink);">{{gal.cur.deviceStatusLine}}</div>
+                <div class="uc-data" style="color: var(--ink-muted);">{{gal.cur.deviceStorageLine}}</div>
+              </section>
+            </sc-if>
+          </aside>
+        </div>
+
+      </div>
       </div>
     </sc-if>
 
@@ -158,8 +841,9 @@ a { color: var(--phosphor); text-decoration: none; } a:hover { text-decoration: 
         </section>
 
         <section style="display: flex; flex-direction: column; gap: 12px;">
-          <h2 class="uc-heading" style="margin: 0; color: var(--ink);">Sync</h2>
-          <x-import component-from-global-scope="USBCloud.Input" label="Pull interval" default-value="30" hint="Seconds. Minimum is 5 seconds."></x-import>
+          <h2 class="uc-heading" style="margin: 0; color: var(--ink);">Defaults for new devices</h2>
+          <div class="uc-data" style="color: var(--ink-muted);">Each device can override these on its own Settings tab.</div>
+          <x-import component-from-global-scope="USBCloud.Input" label="Pull interval" default-value="60" hint="Seconds. Minimum is 5 seconds."></x-import>
           <x-import component-from-global-scope="USBCloud.Select" label="Conflict policy" options="{{conflictOptions}}" value="{{conflict}}" on-change="{{setConflict}}"></x-import>
           <x-import component-from-global-scope="USBCloud.Select" label="Theme" options="{{themeOptions}}" value="{{theme}}" on-change="{{setTheme}}"></x-import>
         </section>
@@ -171,40 +855,157 @@ a { color: var(--phosphor); text-decoration: none; } a:hover { text-decoration: 
       </div>
     </sc-if>
 
+    <x-import component-from-global-scope="USBCloud.Dialog" open="{{add.open}}" kicker="Fleet" title="Add a device" on-close="{{add.close}}" actions="{{add.actions}}" class-name="vf-dialog-wide" id="add">
+      <div style="display: flex; flex-direction: column; gap: 24px;">
+
+        <section style="display: flex; flex-direction: column; gap: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <div style="display: flex; flex-direction: column; gap: 0;">
+              <span class="uc-label" style="color: var(--ink);">Discovered on the network</span>
+              <span class="uc-data" aria-live="polite" style="color: var(--ink-muted);">{{add.scanText}}</span>
+            </div>
+            <sc-if value="{{add.scanning}}" hint-placeholder-val="{{no}}">
+              <x-import component-from-global-scope="USBCloud.Button" size="small" disabled="{{yes}}"><span class="uc-spin" aria-hidden="true"></span>Scanning</x-import>
+            </sc-if>
+            <sc-if value="{{add.scanIdle}}" hint-placeholder-val="{{yes}}">
+              <x-import component-from-global-scope="USBCloud.Button" size="small" icon="refresh-cw" on-click="{{add.rescan}}">Scan again</x-import>
+            </sc-if>
+          </div>
+          <div style="border: 1px solid var(--line); background: var(--surface);">
+            <sc-if value="{{add.noneFound}}" hint-placeholder-val="{{no}}">
+              <div class="uc-data" style="padding: 16px; color: var(--ink-muted); text-align: center;">Listening for USBCloud clients…</div>
+            </sc-if>
+            <sc-for list="{{add.found}}" as="fd" hint-placeholder-count="3">
+              <div style="display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--line);">
+                <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0;">
+                  <span class="uc-data vf-ellipsis" style="font-weight: 600; letter-spacing: 0.04em; color: var(--ink);">{{fd.host}}</span>
+                  <span class="uc-data vf-ellipsis" style="color: var(--ink-muted);">{{fd.meta}}</span>
+                </div>
+                <span class="uc-label" style="color: {{fd.noteColor}}; white-space: nowrap;">{{fd.note}}</span>
+                <sc-if value="{{fd.canAdd}}" hint-placeholder-val="{{yes}}">
+                  <x-import component-from-global-scope="USBCloud.Button" size="small" icon="plug" on-click="{{fd.add}}">Add</x-import>
+                </sc-if>
+                <sc-if value="{{fd.known}}" hint-placeholder-val="{{no}}">
+                  <x-import component-from-global-scope="USBCloud.Button" size="small" variant="ghost" icon="chevron-right" on-click="{{fd.open}}">Open</x-import>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </section>
+
+        <section style="display: flex; flex-direction: column; gap: 12px;">
+          <span class="uc-label" style="color: var(--ink);">Or add by address</span>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+            <x-import component-from-global-scope="USBCloud.Input" label="Hostname or IP" prompt="&gt;" placeholder="10.0.4.31 or pi-garage.local" value="{{add.form.host.v}}" on-change="{{add.form.host.set}}" error="{{add.form.hostError}}"></x-import>
+            <x-import component-from-global-scope="USBCloud.Input" label="Device name" placeholder="Optional, e.g. Garage Blink" value="{{add.form.name.v}}" on-change="{{add.form.name.set}}"></x-import>
+            <x-import component-from-global-scope="USBCloud.Input" label="SSH port" type="number" min="1" max="65535" value="{{add.form.port.v}}" on-change="{{add.form.port.set}}"></x-import>
+            <x-import component-from-global-scope="USBCloud.Input" label="Username" value="{{add.form.user.v}}" on-change="{{add.form.user.set}}"></x-import>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <span class="uc-data" aria-live="polite" style="color: {{add.resultColor}};">{{add.resultText}}</span>
+            <sc-if value="{{add.connecting}}" hint-placeholder-val="{{no}}">
+              <x-import component-from-global-scope="USBCloud.Button" variant="primary" disabled="{{yes}}"><span class="uc-spin" aria-hidden="true"></span>{{add.connectingText}}</x-import>
+            </sc-if>
+            <sc-if value="{{add.canSubmit}}" hint-placeholder-val="{{yes}}">
+              <x-import component-from-global-scope="USBCloud.Button" variant="primary" icon="plug" on-click="{{add.submit}}">Connect and add</x-import>
+            </sc-if>
+          </div>
+        </section>
+
+      </div>
+    </x-import>
+
   </div>
 </div>
 </x-dc>
 <script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["phosphor","paper"],"default":"phosphor","section":"Theme"},"$preview":{"width":1440,"height":1100}}'>
 class Component extends DCLogic {
+  componentDidMount() {
+    var self = this;
+    this._timer = setInterval(function () { self.setState({ tick: ((self.state && self.state.tick) || 0) + 1 }); }, 1000);
+  }
+  componentWillUnmount() { if (this._timer) clearInterval(this._timer); }
+  componentDidUpdate() {
+    var s = this.state || {}, tick = s.tick || 0;
+    if (s.screen === 'gallery' && this._lastGal !== (s.galleryFile || null)) {
+      this._lastGal = s.galleryFile || null;
+      ['vf-gal-cur'].forEach(function (id) { var n = document.getElementById(id); if (n && n.scrollIntoView) n.scrollIntoView({ block: 'nearest', inline: 'center' }); });
+    }
+    if (s.addTest && tick - s.addTest.start >= 3) {
+      var t = s.addTest;
+      var addr = /^\d+\.\d+\.\d+\.\d+$/.test(t.host) ? t.host : '10.0.4.' + (40 + (t.host.length % 50));
+      this.completeAdd({ host: t.host, addr: addr, port: t.port, user: t.user, name: t.name, model: null, fw: null });
+    }
+  }
+  completeAdd(t) {
+    var s = this.state || {}, tick = s.tick || 0;
+    var removed = s.removed || {};
+    var all = this.devices().concat(s.addedDevices || []).filter(function (d) { return !removed[d.id]; });
+    var stem = (t.name || t.host.split('.')[0].replace('usbcloud-', '')).trim().toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 10) || 'PI';
+    var n = 1; while (all.some(function (d) { return d.id === stem + '-0' + n; })) n++;
+    var id = stem + '-0' + n;
+    var d = { id: id, name: t.name || t.host.split('.')[0], site: 'Unassigned', status: 'online', usedBytes: 0.3e9, totalBytes: 32e9, lastSync: 'never', pending: 0, mount: '/mnt/usb0', host: t.host, addr: t.addr, model: t.model || 'Raspberry Pi (model reported after pairing)', fw: t.fw || '2.4.1', uptime: '0 d 00:00', fs: 'exFAT', lastFile: '—', addedAt: tick, cfg: { port: t.port, user: t.user } };
+    this.setState({ addedDevices: (s.addedDevices || []).concat([d]), addResult: { id: id, at: tick }, addForm: { host: '', port: '22', user: 'pi', name: '' }, addTest: null });
+  }
+
   devices() {
     return [
-      { id: 'WAREHOUSE-07', name: 'Dock 3 scanner', status: 'online', usedBytes: 7.4e9, totalBytes: 32e9, lastSync: '29 s ago', pending: 0, mount: '/mnt/usb0', addr: '10.0.4.17', fw: '2.4.1', uptime: '11 d 04:12', fs: 'exFAT', lastFile: 'scan_20261106_1358.pdf' },
-      { id: 'WAREHOUSE-02', name: 'Dock 1 scanner', status: 'online', usedBytes: 12.8e9, totalBytes: 32e9, lastSync: '4 min ago', pending: 3, mount: '/mnt/usb0', addr: '10.0.4.12', fw: '2.4.1', uptime: '11 d 04:09', fs: 'exFAT', lastFile: 'scan_20261106_1401.pdf' },
-      { id: 'FIELD-12', name: 'Van 12 logger', status: 'syncing', usedBytes: 19.1e9, totalBytes: 32e9, lastSync: 'just now', pending: 38, mount: '/mnt/usb0', addr: '10.0.9.112', fw: '2.4.0', uptime: '0 d 06:51', fs: 'ext4', lastFile: 'van12_20261106.csv' },
-      { id: 'FIELD-09', name: 'Van 9 logger', status: 'offline', usedBytes: 2.0e9, totalBytes: 16e9, lastSync: '4 h ago', pending: 4, mount: '/mnt/usb0', addr: '10.0.9.109', fw: '2.3.7', uptime: '0 d 00:00', fs: 'ext4', lastFile: 'van9_20261106.csv' },
-      { id: 'KIOSK-02', name: 'Lobby kiosk', status: 'fault', fault: 'mount', usedBytes: 31.2e9, totalBytes: 32e9, lastSync: '2 d ago', pending: 112, mount: '/mnt/usb0', addr: '10.0.2.22', fw: '2.2.0', uptime: '41 d 19:03', fs: 'FAT32', lastFile: 'session_8812.json' },
-      { id: 'FIELD-03', name: 'Van 3 logger', status: 'online', usedBytes: 5.6e9, totalBytes: 16e9, lastSync: '12 min ago', pending: 0, mount: '/mnt/usb0', addr: '10.0.9.103', fw: '2.4.1', uptime: '2 d 01:40', fs: 'ext4', lastFile: 'van3_20261106.csv' },
-      { id: 'LAB-01', name: 'Bench recorder', status: 'online', usedBytes: 44.0e9, totalBytes: 128e9, lastSync: '45 s ago', pending: 6, mount: '/mnt/usb1', addr: '10.0.6.5', fw: '2.4.1', uptime: '7 d 12:30', fs: 'ext4', lastFile: 'rec_1401.wav' },
-      { id: 'GATE-04', name: 'Gate camera store', status: 'online', usedBytes: 88.3e9, totalBytes: 128e9, lastSync: '3 min ago', pending: 0, mount: '/mnt/usb0', addr: '10.0.3.44', fw: '2.4.1', uptime: '19 d 08:15', fs: 'exFAT', lastFile: 'gate04_1359.mp4' },
-      { id: 'YARD-11', name: 'Yard tablet', status: 'syncing', usedBytes: 9.7e9, totalBytes: 32e9, lastSync: 'just now', pending: 21, mount: '/mnt/usb0', addr: '10.0.5.111', fw: '2.4.0', uptime: '1 d 03:22', fs: 'ext4', lastFile: 'photo_0412.jpg' },
-      { id: 'OFFICE-05', name: 'Front desk', status: 'online', usedBytes: 1.2e9, totalBytes: 16e9, lastSync: '1 h ago', pending: 0, mount: '/mnt/usb0', addr: '10.0.1.55', fw: '2.4.1', uptime: '30 d 00:48', fs: 'exFAT', lastFile: 'visitors_1215.csv' },
-      { id: 'PLANT-08', name: 'Line 8 PLC dump', status: 'online', usedBytes: 25.5e9, totalBytes: 64e9, lastSync: '2 min ago', pending: 2, mount: '/mnt/usb0', addr: '10.0.7.88', fw: '2.4.1', uptime: '5 d 16:04', fs: 'ext4', lastFile: 'line8_dump_1400.bin' },
-      { id: 'DEPOT-06', name: 'Depot scale', status: 'online', usedBytes: 0.8e9, totalBytes: 16e9, lastSync: '18 min ago', pending: 0, mount: '/mnt/usb0', addr: '10.0.8.66', fw: '2.3.9', uptime: '14 d 22:11', fs: 'FAT32', lastFile: 'weigh_1344.csv' }
+      { id: 'WAREHOUSE-07', name: 'Dock 3 scanner', site: 'Warehouse', status: 'online', usedBytes: 7.4e9, totalBytes: 32e9, lastSync: '29 s ago', pending: 0, mount: '/mnt/usb0', host: 'usbcloud-wh07.local', addr: '10.0.4.17', model: 'Raspberry Pi Zero 2 W', fw: '2.4.1', uptime: '11 d 04:12', fs: 'exFAT', lastFile: 'scan_20261106_1358.pdf' },
+      { id: 'WAREHOUSE-02', name: 'Dock 1 scanner', site: 'Warehouse', status: 'online', usedBytes: 12.8e9, totalBytes: 32e9, lastSync: '4 min ago', pending: 3, pendingBytes: 1.2e6, mount: '/mnt/usb0', host: 'usbcloud-wh02.local', addr: '10.0.4.12', model: 'Raspberry Pi Zero 2 W', fw: '2.4.1', uptime: '11 d 04:09', fs: 'exFAT', lastFile: 'scan_20261106_1401.pdf' },
+      { id: 'FIELD-12', name: 'Van 12 logger', site: 'Vehicles', status: 'syncing', usedBytes: 19.1e9, totalBytes: 32e9, lastSync: 'just now', pending: 38, mount: '/mnt/usb0', host: 'usbcloud-van12.local', addr: '10.0.9.112', model: 'Raspberry Pi 4 B', fw: '2.4.0', uptime: '0 d 06:51', fs: 'ext4', lastFile: 'van12_20261106.csv', cfg: { interval: '300', bandwidth: '1' },
+        transfer: { total: 2.1e9, base: 1.28e9, rate: 0.55e6, files: 38, current: 'van12_20261106.csv', currentBytes: 58.2e6 } },
+      { id: 'FIELD-09', name: 'Van 9 logger', site: 'Vehicles', status: 'offline', usedBytes: 2.0e9, totalBytes: 16e9, lastSync: '4 h ago', pending: 4, mount: '/mnt/usb0', host: 'usbcloud-van09.local', addr: '10.0.9.109', model: 'Raspberry Pi 4 B', fw: '2.3.7', uptime: '0 d 00:00', fs: 'ext4', lastFile: 'van9_20261106.csv', cfg: { interval: '300', bandwidth: '1', retryCount: '5', retryDelay: '60' } },
+      { id: 'KIOSK-02', name: 'Lobby kiosk', site: 'Building', status: 'fault', fault: 'mount', usedBytes: 31.2e9, totalBytes: 32e9, lastSync: '2 d ago', pending: 112, mount: '/mnt/usb0', host: 'usbcloud-kiosk02.local', addr: '10.0.2.22', model: 'Raspberry Pi 3 B+', fw: '2.2.0', uptime: '41 d 19:03', fs: 'FAT32', lastFile: 'session_8812.json' },
+      { id: 'FIELD-03', name: 'Van 3 logger', site: 'Vehicles', status: 'online', usedBytes: 5.6e9, totalBytes: 16e9, lastSync: '12 min ago', pending: 0, mount: '/mnt/usb0', host: 'usbcloud-van03.local', addr: '10.0.9.103', model: 'Raspberry Pi 4 B', fw: '2.4.1', uptime: '2 d 01:40', fs: 'ext4', lastFile: 'van3_20261106.csv', cfg: { interval: '300', bandwidth: '1' } },
+      { id: 'LAB-01', name: 'Bench recorder', site: 'Building', status: 'online', usedBytes: 44.0e9, totalBytes: 128e9, lastSync: '45 s ago', pending: 6, pendingBytes: 212e6, mount: '/mnt/usb1', host: 'usbcloud-lab01.local', addr: '10.0.6.5', model: 'Raspberry Pi 4 B', fw: '2.4.1', uptime: '7 d 12:30', fs: 'ext4', lastFile: 'rec_1401.wav' },
+      { id: 'GATE-04', name: 'Gate camera store', site: 'Building', status: 'online', usedBytes: 88.3e9, totalBytes: 128e9, lastSync: '3 min ago', pending: 1, pendingBytes: 1.4e9, mount: '/mnt/usb0', host: 'usbcloud-gate04.local', addr: '10.0.3.44', model: 'Raspberry Pi 4 B', fw: '2.4.1', uptime: '19 d 08:15', fs: 'exFAT', lastFile: 'gate04_1359.mp4', cfg: { snapshotTimeout: '900' } },
+      { id: 'YARD-11', name: 'Yard tablet', site: 'Warehouse', status: 'syncing', usedBytes: 9.7e9, totalBytes: 32e9, lastSync: 'just now', pending: 21, mount: '/mnt/usb0', host: 'usbcloud-yard11.local', addr: '10.0.5.111', model: 'Raspberry Pi Zero 2 W', fw: '2.4.0', uptime: '1 d 03:22', fs: 'ext4', lastFile: 'photo_0412.jpg',
+        transfer: { total: 640e6, base: 140e6, rate: 0.4e6, files: 21, current: 'photo_0412.jpg', currentBytes: 3.1e6 } },
+      { id: 'OFFICE-05', name: 'Front desk', site: 'Building', status: 'online', usedBytes: 1.2e9, totalBytes: 16e9, lastSync: '1 h ago', pending: 0, mount: '/mnt/usb0', host: 'usbcloud-office05.local', addr: '10.0.1.55', model: 'Raspberry Pi Zero 2 W', fw: '2.4.1', uptime: '30 d 00:48', fs: 'exFAT', lastFile: 'visitors_1215.csv', cfg: { interval: '3600' } },
+      { id: 'PLANT-08', name: 'Line 8 PLC dump', site: 'Warehouse', status: 'online', usedBytes: 25.5e9, totalBytes: 64e9, lastSync: '2 min ago', pending: 2, pendingBytes: 48e6, mount: '/mnt/usb0', host: 'usbcloud-plant08.local', addr: '10.0.7.88', model: 'Raspberry Pi 4 B', fw: '2.4.1', uptime: '5 d 16:04', fs: 'ext4', lastFile: 'line8_dump_1400.bin' },
+      { id: 'DEPOT-06', name: 'Depot scale', site: 'Warehouse', status: 'online', usedBytes: 0.8e9, totalBytes: 16e9, lastSync: '18 min ago', pending: 0, mount: '/mnt/usb0', host: 'usbcloud-depot06.local', addr: '10.0.8.66', model: 'Raspberry Pi Zero 2 W', fw: '2.3.9', uptime: '14 d 22:11', fs: 'FAT32', lastFile: 'weigh_1344.csv', cfg: { autoSync: false } },
+      { id: 'GARAGE-01', name: 'Garage Blink', site: 'Home', status: 'online', usedBytes: 18.4e9, totalBytes: 64e9, lastSync: '6 min ago', pending: 2, pendingBytes: 96e6, mount: '/mnt/usb0', host: 'usbcloud-garage.local', addr: '10.0.0.31', model: 'Raspberry Pi Zero 2 W', fw: '2.4.1', uptime: '3 d 09:18', fs: 'exFAT', lastFile: 'garage_20261106_1353.mp4', cfg: { interval: '60' } },
+      { id: 'DRIVE-02', name: 'Driveway Blink', site: 'Home', status: 'online', usedBytes: 22.1e9, totalBytes: 64e9, lastSync: '1 min ago', pending: 0, mount: '/mnt/usb0', host: 'usbcloud-driveway.local', addr: '10.0.0.32', model: 'Raspberry Pi Zero 2 W', fw: '2.4.1', uptime: '3 d 09:15', fs: 'exFAT', lastFile: 'driveway_20261106_1400.mp4', cfg: { interval: '60' } }
     ];
   }
 
   files() {
     return [
-      { path: '/mnt/usb0/scan_20261106_1358.pdf', device: 'WAREHOUSE-07', size: '412 KB', modified: '13:58:02', state: 'pulled' },
-      { path: '/mnt/usb0/scan_20261106_1401.pdf', device: 'WAREHOUSE-02', size: '388 KB', modified: '14:01:12', state: 'pending' },
-      { path: '/mnt/usb0/log/van12_20261106.csv', device: 'FIELD-12', size: '58.2 MB', modified: '14:02:30', state: 'pending' },
-      { path: '/mnt/usb0/log/van12_20261105.csv', device: 'FIELD-12', size: '61.0 MB', modified: '2026-11-05', state: 'pulled' },
-      { path: '/mnt/usb0/cam/gate04_1359.mp4', device: 'GATE-04', size: '1.4 GB', modified: '13:59:30', state: 'pulled' },
-      { path: '/mnt/usb0/kiosk/session_8812.json', device: 'KIOSK-02', size: '14 KB', modified: '2026-11-04', state: 'pending' },
-      { path: '/mnt/usb0/plc/line8_dump_1400.bin', device: 'PLANT-08', size: '24.3 MB', modified: '14:00:02', state: 'pulled' },
-      { path: '/mnt/usb0/yard/photo_0412.jpg', device: 'YARD-11', size: '3.1 MB', modified: '14:02:31', state: 'pending' },
-      { path: '/mnt/usb1/bench/rec_1401.wav', device: 'LAB-01', size: '212 MB', modified: '14:01:55', state: 'pending' },
-      { path: '/mnt/usb0/log/van9_20261106.csv', device: 'FIELD-09', size: '12.8 MB', modified: '09:41:03', state: 'pending' }
+      { path: '/mnt/usb0/log/van12_20261106.csv', device: 'FIELD-12', bytes: 58.2e6, at: '2026-11-06T14:02:30', state: 'pulling', kind: 'data', rows: '412,900' },
+      { path: '/mnt/usb0/yard/photo_0412.jpg', device: 'YARD-11', bytes: 3.1e6, at: '2026-11-06T14:02:31', state: 'pulling', kind: 'image', dims: '4032 × 3024' },
+      { path: '/mnt/usb1/bench/rec_1401.wav', device: 'LAB-01', bytes: 212e6, at: '2026-11-06T14:01:55', state: 'pending', kind: 'audio', duration: 1200 },
+      { path: '/mnt/usb0/scan_20261106_1401.pdf', device: 'WAREHOUSE-02', bytes: 388e3, at: '2026-11-06T14:01:12', state: 'pending', kind: 'doc', pages: 2 },
+      { path: '/mnt/usb0/clips/driveway_20261106_1400.mp4', device: 'DRIVE-02', bytes: 33e6, at: '2026-11-06T14:00:12', state: 'pulled', kind: 'video', duration: 36, res: '1920 × 1080', fps: 30 },
+      { path: '/mnt/usb0/plc/line8_dump_1400.bin', device: 'PLANT-08', bytes: 24.3e6, at: '2026-11-06T14:00:02', state: 'pulled', kind: 'data', rows: '—' },
+      { path: '/mnt/usb0/cam/gate04_1359.mp4', device: 'GATE-04', bytes: 1.4e9, at: '2026-11-06T13:59:30', state: 'pending', kind: 'video', duration: 930, res: '2560 × 1440', fps: 25 },
+      { path: '/mnt/usb0/yard/photo_0411.jpg', device: 'YARD-11', bytes: 2.9e6, at: '2026-11-06T13:58:49', state: 'pulled', kind: 'image', dims: '4032 × 3024' },
+      { path: '/mnt/usb0/scan_20261106_1358.pdf', device: 'WAREHOUSE-07', bytes: 412e3, at: '2026-11-06T13:58:02', state: 'pulled', kind: 'doc', pages: 3 },
+      { path: '/mnt/usb0/clips/garage_20261106_1353.mp4', device: 'GARAGE-01', bytes: 55e6, at: '2026-11-06T13:53:40', state: 'pending', kind: 'video', duration: 27, res: '1920 × 1080', fps: 30 },
+      { path: '/mnt/usb0/clips/garage_20261106_1352.mp4', device: 'GARAGE-01', bytes: 41e6, at: '2026-11-06T13:52:18', state: 'pending', kind: 'video', duration: 42, res: '1920 × 1080', fps: 30 },
+      { path: '/mnt/usb0/cam/gate04_1344.mp4', device: 'GATE-04', bytes: 1.2e9, at: '2026-11-06T13:44:10', state: 'pulled', kind: 'video', duration: 900, res: '2560 × 1440', fps: 25 },
+      { path: '/mnt/usb0/depot/weigh_1344.csv', device: 'DEPOT-06', bytes: 180e3, at: '2026-11-06T13:43:50', state: 'pulled', kind: 'data', rows: '1,208' },
+      { path: '/mnt/usb1/bench/rec_1340.wav', device: 'LAB-01', bytes: 198e6, at: '2026-11-06T13:40:12', state: 'pulled', kind: 'audio', duration: 1122 },
+      { path: '/mnt/usb0/cam/gate04_1329.mp4', device: 'GATE-04', bytes: 1.2e9, at: '2026-11-06T13:29:02', state: 'pulled', kind: 'video', duration: 900, res: '2560 × 1440', fps: 25 },
+      { path: '/mnt/usb0/clips/garage_20261106_1311.mp4', device: 'GARAGE-01', bytes: 52e6, at: '2026-11-06T13:11:05', state: 'pulled', kind: 'video', duration: 58, res: '1920 × 1080', fps: 30 },
+      { path: '/mnt/usb0/clips/driveway_20261106_1218.mp4', device: 'DRIVE-02', bytes: 44e6, at: '2026-11-06T12:18:50', state: 'pulled', kind: 'video', duration: 49, res: '1920 × 1080', fps: 30 },
+      { path: '/mnt/usb0/visitors_1215.csv', device: 'OFFICE-05', bytes: 22e3, at: '2026-11-06T12:15:08', state: 'pulled', kind: 'data', rows: '64' },
+      { path: '/mnt/usb0/log/van9_20261106.csv', device: 'FIELD-09', bytes: 12.8e6, at: '2026-11-06T09:41:03', state: 'pending', kind: 'data', rows: '90,210' },
+      { path: '/mnt/usb0/clips/garage_20261106_0742.mp4', device: 'GARAGE-01', bytes: 28e6, at: '2026-11-06T07:42:30', state: 'pulled', kind: 'video', duration: 31, res: '1920 × 1080', fps: 30 },
+      { path: '/mnt/usb0/clips/driveway_20261106_0655.mp4', device: 'DRIVE-02', bytes: 64e6, at: '2026-11-06T06:55:21', state: 'pulled', kind: 'video', duration: 72, res: '1920 × 1080', fps: 30 },
+      { path: '/mnt/usb0/log/van12_20261105.csv', device: 'FIELD-12', bytes: 61.0e6, at: '2026-11-05T23:59:40', state: 'pulled', kind: 'data', rows: '431,112' },
+      { path: '/mnt/usb0/clips/garage_20261105_2218.mp4', device: 'GARAGE-01', bytes: 57e6, at: '2026-11-05T22:18:44', state: 'pulled', kind: 'video', duration: 64, res: '1920 × 1080', fps: 30 },
+      { path: '/mnt/usb0/kiosk/session_8812.json', device: 'KIOSK-02', bytes: 14e3, at: '2026-11-04T16:20:11', state: 'failed', reason: 'mount', kind: 'data', rows: '—' },
+      { path: '/mnt/usb0/clips/driveway_20261104_1930.mp4', device: 'DRIVE-02', bytes: 39e6, at: '2026-11-04T19:30:05', state: 'pulled', kind: 'video', duration: 40, res: '1920 × 1080', fps: 30 },
+      { path: '/mnt/usb0/cam/gate04_20261030_0900.mp4', device: 'GATE-04', bytes: 1.1e9, at: '2026-10-30T09:00:00', state: 'pulled', kind: 'video', duration: 900, res: '2560 × 1440', fps: 25 }
+    ];
+  }
+
+  discovered() {
+    return [
+      { host: 'usbcloud-pi-7f3a.local', addr: '10.0.4.31', model: 'Raspberry Pi Zero 2 W', fw: '2.4.1' },
+      { host: 'usbcloud-gate04.local', addr: '10.0.3.44', model: 'Raspberry Pi 4 B', fw: '2.4.1' },
+      { host: 'usbcloud-pi-c21e.local', addr: '10.0.9.120', model: 'Raspberry Pi 4 B', fw: '2.3.9' },
+      { host: 'usbcloud-pi-0b9d.local', addr: '10.0.0.40', model: 'Raspberry Pi Zero 2 W', fw: '2.4.1' }
     ];
   }
 
@@ -222,27 +1023,81 @@ class Component extends DCLogic {
     ];
   }
 
+  defaultCfg(d) {
+    var c = { name: d.name, host: d.host, port: '22', user: 'pi', autoSync: true, interval: '60', bandwidth: '0', snapshotTimeout: '300', retryCount: '3', retryDelay: '30' };
+    if (d.cfg) for (var k in d.cfg) c[k] = d.cfg[k];
+    return c;
+  }
+
   fmtGB(n) { return (n / 1e9).toFixed(1) + ' GB'; }
+  fmtB(n) {
+    if (n == null) return '—';
+    var u = ['B', 'KB', 'MB', 'GB'], i = 0, v = n;
+    while (v >= 1000 && i < u.length - 1) { v /= 1000; i++; }
+    return (i === 0 ? Math.round(v) : v < 100 ? Math.round(v * 10) / 10 : Math.round(v)) + ' ' + u[i];
+  }
+  fmtRate(bps) { return bps >= 1e6 ? (bps / 1e6).toFixed(1) + ' MB/s' : Math.round(bps / 1e3) + ' KB/s'; }
+  fmtEta(sec) {
+    if (sec == null) return '—';
+    sec = Math.max(0, Math.round(sec));
+    if (sec < 5) return 'a few seconds';
+    if (sec < 60) return sec + ' s';
+    if (sec < 3600) return Math.floor(sec / 60) + ' min ' + (sec % 60) + ' s';
+    return Math.floor(sec / 3600) + ' h ' + Math.floor((sec % 3600) / 60) + ' min';
+  }
+  fmtDur(sec) {
+    sec = Math.max(0, Math.round(sec));
+    if (sec < 60) return sec + ' s';
+    if (sec < 3600) return (sec % 60 ? Math.floor(sec / 60) + ' min ' + (sec % 60) + ' s' : Math.floor(sec / 60) + ' min');
+    return Math.floor(sec / 3600) + ' h' + (Math.floor((sec % 3600) / 60) ? ' ' + Math.floor((sec % 3600) / 60) + ' min' : '');
+  }
+  fmtClock(sec) {
+    sec = Math.max(0, Math.floor(sec));
+    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    return (h ? h + ':' + pad(m) : m) + ':' + pad(s);
+  }
+  addClock(stamp, sec) {
+    var p = stamp.split(':').map(Number);
+    var t = (p[0] * 3600 + p[1] * 60 + p[2] + Math.floor(sec)) % 86400;
+    var pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    return pad(Math.floor(t / 3600)) + ':' + pad(Math.floor((t % 3600) / 60)) + ':' + pad(t % 60);
+  }
+  fmtDelta(sec) {
+    var a = Math.abs(sec), sign = sec < 0 ? '−' : '+';
+    if (a < 60) return sign + Math.round(a) + ' s';
+    if (a < 7200) return sign + Math.round(a / 60) + ' min';
+    if (a < 86400) return sign + (Math.round(a / 360) / 10) + ' h';
+    return sign + Math.round(a / 86400) + ' d';
+  }
+  elapsed(clock, tick) { return Math.max(0, (clock.pausedAt != null ? clock.pausedAt : tick) - clock.start); }
+  dateOf(at) { return at.slice(0, 10); }
+  timeOf(at) { return at.slice(11, 19); }
+  modifiedText(at) { return this.dateOf(at) === '2026-11-06' ? this.timeOf(at) : this.dateOf(at); }
+  epoch(at) { return Date.parse(at) / 1000; }
 
   deviceLog(d) {
-    var at = { 'WAREHOUSE-07': '14:02:11', 'WAREHOUSE-02': '13:58:40', 'FIELD-12': '14:02:30', 'FIELD-09': '09:41:03', 'KIOSK-02': '14:01:12', 'FIELD-03': '13:50:12', 'LAB-01': '14:01:55', 'GATE-04': '13:59:30', 'YARD-11': '14:02:31', 'OFFICE-05': '12:15:08', 'PLANT-08': '14:00:02', 'DEPOT-06': '13:44:27' }[d.id] || '14:02:40';
+    var at = { 'WAREHOUSE-07': '14:02:11', 'WAREHOUSE-02': '13:58:40', 'FIELD-12': '14:02:30', 'FIELD-09': '09:41:03', 'KIOSK-02': '14:01:12', 'FIELD-03': '13:50:12', 'LAB-01': '14:01:55', 'GATE-04': '13:59:30', 'YARD-11': '14:02:31', 'OFFICE-05': '12:15:08', 'PLANT-08': '14:00:02', 'DEPOT-06': '13:44:27', 'GARAGE-01': '13:56:40', 'DRIVE-02': '14:01:30' }[d.id] || '14:02:40';
     var used = this.fmtGB(d.usedBytes), total = this.fmtGB(d.totalBytes);
     var lines = [
-      { id: 1, time: '06:00:00', level: 'info', message: 'Client ' + d.id + ' (fw ' + d.fw + ') connected from ' + d.addr + '.' },
-      { id: 2, time: '06:00:02', level: 'ok', message: 'Mounted ' + d.mount + ' (' + d.fs + '): ' + used + ' of ' + total + ' used.' }
+      { id: 1, time: '06:00:00', level: 'info', message: 'Client ' + d.id + ' (agent ' + d.fw + ') connected from ' + d.addr + ' as ' + d.cfgUser + '@' + d.host + ':' + d.cfgPort + '.' },
+      { id: 2, time: '06:00:02', level: 'ok', message: 'Snapshot opened; mounted ' + d.mount + ' (' + d.fs + ') read-only: ' + used + ' of ' + total + ' used.' }
     ];
-    if (d.status === 'online') {
+    if (d.connecting) {
+      lines.push({ id: 3, time: at, level: 'info', message: 'Pairing: installing server key for ' + d.cfgUser + '@' + d.host + '…' });
+      lines.push({ id: 4, time: at, level: 'info', message: 'Waiting for the agent to report its drive.' });
+    } else if (d.progress) {
+      lines.push({ id: 3, time: at, level: 'info', message: 'Sync started: ' + d.progress.files + ' files queued (' + this.fmtB(d.progress.total) + ').' });
+      lines.push({ id: 4, time: at, level: d.progress.paused ? 'warn' : 'info', message: (d.progress.paused ? 'Paused at ' : 'Transferring ') + d.progress.current + ' (' + d.progress.curPct + '%), ' + d.progress.filesDone + ' of ' + d.progress.files + ' done.' });
+    } else if (d.status === 'online') {
       lines.push({ id: 3, time: at, level: 'ok', message: 'Pull complete: ' + d.pending + ' new files; last file ' + d.lastFile + '.' });
-      lines.push({ id: 4, time: at, level: 'info', message: 'Idle. Next pull on schedule.' });
-    } else if (d.status === 'syncing') {
-      lines.push({ id: 3, time: at, level: 'info', message: 'Sync started: ' + d.pending + ' files queued.' });
-      lines.push({ id: 4, time: at, level: 'info', message: 'Transferring ' + d.lastFile + ' …' });
+      lines.push({ id: 4, time: at, level: 'info', message: d.autoSync ? 'Snapshot closed. Next sync on schedule.' : 'Snapshot closed. Automatic sync is paused.' });
     } else if (d.status === 'offline') {
       lines.push({ id: 3, time: at, level: 'warn', message: 'Heartbeat missed; ' + d.pending + ' files still pending.' });
-      lines.push({ id: 4, time: at, level: 'err', message: 'Connection lost (ETIMEDOUT); reconnecting every 60 s.' });
+      lines.push({ id: 4, time: at, level: 'err', message: 'Connection lost (ETIMEDOUT); retry ' + d.cfgRetryCount + ' × every ' + d.cfgRetryDelay + ' s.' });
     } else {
       lines.push({ id: 3, time: '14:01:10', level: 'warn', message: 'Storage at ' + Math.round(d.usedBytes / d.totalBytes * 100) + '%: ' + this.fmtGB(d.totalBytes - d.usedBytes) + ' free.' });
-      lines.push({ id: 4, time: at, level: 'err', message: 'Mount failed: device busy (EBUSY); retry in 30 s.' });
+      lines.push({ id: 4, time: at, level: 'err', message: 'Mount failed: device busy (EBUSY); retry in ' + d.cfgRetryDelay + ' s.' });
     }
     return lines;
   }
@@ -252,78 +1107,660 @@ class Component extends DCLogic {
     var s = this.state || {};
     var R = window.React, U = window.USBCloud;
     var el = function (type, props, children) { return (R && U && U[type]) ? R.createElement(U[type], props, children) : null; };
+    var tick = s.tick || 0;
+    var copy = function (o) { var n = {}; for (var k in o) n[k] = o[k]; return n; };
 
     var screen = s.screen || 'devices';
     var tab = s.tab || 'all';
-    var fileTab = s.fileTab || 'pending';
+    var fileTab = s.fileTab || 'all';
     var theme = s.theme || this.props.theme || 'phosphor';
     var conflict = s.conflict || 'keep-newest';
     var logRows = s.logRows || [['server']];
     var setRows = function (rows) { self.setState({ logRows: rows.filter(function (r) { return r.length > 0; }) }); };
     var copyRows = function () { return logRows.map(function (r) { return r.slice(); }); };
 
-    var devices = this.devices();
+    // ---- Filters ----
+    var FDEF = {
+      dev: { q: '', site: 'any', fw: 'any', storage: 'any', pending: 'any', auto: 'any', sort: 'id' },
+      files: { q: '', device: 'any', type: 'any', date: 'any', size: 'any', sort: 'newest' },
+      gal: { q: '', device: 'any', date: 'any', duration: 'any', state: 'any', sort: 'newest' }
+    };
+    var filters = s.filters || {};
+    var filterOpen = s.filterOpen || {};
+    var fget = function (page) { var o = copy(FDEF[page]); var cur = filters[page] || {}; for (var k in cur) o[k] = cur[k]; return o; };
+    var fset = function (page, key, value) {
+      var next = copy(filters); var cur = copy(fget(page)); cur[key] = value; next[page] = cur; self.setState({ filters: next });
+    };
+    var mkField = function (page, key, options) {
+      var cur = fget(page);
+      return { v: cur[key], options: options, set: function (e) { fset(page, key, (e && e.target) ? e.target.value : e); } };
+    };
+    var mkFilter = function (page, fields) {
+      var cur = fget(page), n = 0;
+      for (var k in FDEF[page]) if (k !== 'sort' && cur[k] !== FDEF[page][k]) n++;
+      var out = { open: !!filterOpen[page], active: n > 0, count: n, buttonText: n ? 'Filter · ' + n : 'Filter',
+        toggle: function () { var o = copy(filterOpen); o[page] = !o[page]; self.setState({ filterOpen: o }); },
+        clear: function () { var next = copy(filters); next[page] = copy(FDEF[page]); self.setState({ filters: next }); } };
+      for (var f in fields) out[f] = mkField(page, f, fields[f]);
+      return out;
+    };
+    var fdevCur = fget('dev'), ffilesCur = fget('files'), fgalCur = fget('gal');
+    var matchQ = function (q, parts) { q = (q || '').trim().toLowerCase(); if (!q) return true; return parts.join(' ').toLowerCase().indexOf(q) >= 0; };
+    var dateOk = function (sel, at) { var d = at.slice(0, 10); if (sel === 'any') return true; if (sel === 'today') return d === '2026-11-06'; if (sel === 'yesterday') return d === '2026-11-05'; if (sel === 'week') return d >= '2026-10-31'; return true; };
+
+    // ---- Pull (server-initiated, all online devices with pending files) ----
+    var PULL_SECS = 45;
+    var pull = s.pull || null;
+    var pullT = pull ? Math.min(1, this.elapsed(pull, tick) / PULL_SECS) : 0;
+    var pullDone = !!pull && pullT >= 1;
+    var pullPaused = !!pull && !pullDone && pull.pausedAt != null;
+    var pullRunning = !!pull && !pullDone;
+    var pullApplied = pullDone || !!s.pullApplied;
+    var syncClocks = s.sync || {};
+    var settings = s.deviceSettings || {};
+    var removed = s.removed || {};
+
+    var base = this.devices().concat(s.addedDevices || []).filter(function (d) { return !removed[d.id]; });
+    var targets = base.filter(function (d) { return d.status === 'online' && d.pending > 0; });
+    var step = targets.length > 1 ? 0.6 / (targets.length - 1) : 0;
+    var targetIndex = {};
+    targets.forEach(function (d, i) { targetIndex[d.id] = i; });
+
+    var devices = base.map(function (d) {
+      var v = copy(d);
+      var cfg = settings[d.id] || self.defaultCfg(d);
+      v.cfg = cfg; v.name = cfg.name || d.name; v.host = cfg.host || d.host; v.autoSync = cfg.autoSync !== false;
+      v.cfgUser = cfg.user; v.cfgPort = cfg.port; v.cfgRetryCount = cfg.retryCount; v.cfgRetryDelay = cfg.retryDelay;
+      v.progress = null;
+      if (d.addedAt != null && tick - d.addedAt < 6) { v.status = 'connecting'; v.connecting = true; v.lastSync = 'never'; }
+      else if (d.transfer) {
+        var clock = syncClocks[d.id] || { start: 0, pausedAt: null };
+        if (clock.stopped != null) {
+          var doneAtStop = Math.min(d.transfer.total, d.transfer.base + d.transfer.rate * clock.stopped);
+          v.status = 'online'; v.lastSync = 'stopped'; v.pending = d.transfer.files - Math.floor(doneAtStop / d.transfer.total * d.transfer.files); v.stopped = true;
+        } else {
+          var done = Math.min(d.transfer.total, d.transfer.base + d.transfer.rate * self.elapsed(clock, tick));
+          var frac = done / d.transfer.total;
+          if (frac >= 1) { v.status = 'online'; v.pending = 0; v.lastSync = 'just now'; v.finished = true; }
+          else {
+            var filesDone = Math.floor(frac * d.transfer.files);
+            var paused = clock.pausedAt != null;
+            v.progress = { kind: 'sync', pct: Math.round(frac * 100), done: done, total: d.transfer.total, filesDone: filesDone, files: d.transfer.files,
+              current: d.transfer.current, curPct: Math.round(((frac * d.transfer.files) % 1) * 100), currentBytes: d.transfer.currentBytes,
+              rate: d.transfer.rate, eta: paused ? null : (d.transfer.total - done) / d.transfer.rate, paused: paused, openFor: 42 + self.elapsed(clock, tick) };
+            v.pending = d.transfer.files - filesDone;
+          }
+        }
+      } else if (targetIndex[d.id] != null) {
+        var i = targetIndex[d.id];
+        var p = Math.max(0, Math.min(1, (pullT - i * step) / 0.4));
+        if (pullApplied || (pull && p >= 1)) { v.pending = 0; v.lastSync = 'just now'; v.pulled = true; }
+        else if (pull && p > 0) {
+          v.pulling = true;
+          v.progress = { kind: 'pull', pct: Math.round(p * 100), done: p * d.pendingBytes, total: d.pendingBytes, filesDone: Math.floor(p * d.pending), files: d.pending,
+            current: d.lastFile, curPct: Math.round(((p * d.pending) % 1) * 100), currentBytes: d.pendingBytes / d.pending, rate: d.pendingBytes / (PULL_SECS * 0.4),
+            eta: pullPaused ? null : (1 - p) * PULL_SECS * 0.4, paused: pullPaused, openFor: Math.round(p * PULL_SECS * 0.4) };
+          v.pending = d.pending - Math.floor(p * d.pending);
+        }
+        else if (pull) { v.queued = true; }
+      }
+      return v;
+    });
+    var byId = {};
+    devices.forEach(function (d) { byId[d.id] = d; });
+
     var count = function (st) { return devices.filter(function (d) { return d.status === st; }).length; };
-    var online = count('online'), syncing = count('syncing'), offline = count('offline'), faults = count('fault');
+    var online = count('online'), offline = count('offline'), faults = count('fault');
     var pending = devices.reduce(function (n, d) { return n + d.pending; }, 0);
     var pendingDevices = devices.filter(function (d) { return d.pending > 0; }).length;
-    var inFlight = devices.filter(function (d) { return d.status === 'syncing'; }).reduce(function (n, d) { return n + d.pending; }, 0);
     var faultDevice = devices.filter(function (d) { return d.status === 'fault'; })[0];
+    var inProgress = devices.filter(function (d) { return d.progress; });
+    var inFlightFiles = inProgress.reduce(function (n, d) { return n + (d.progress.files - d.progress.filesDone); }, 0);
+    var flightDone = inProgress.reduce(function (n, d) { return n + d.progress.done; }, 0);
+    var flightTotal = inProgress.reduce(function (n, d) { return n + d.progress.total; }, 0);
+    var flightRate = inProgress.filter(function (d) { return !d.progress.paused; }).reduce(function (n, d) { return n + d.progress.rate; }, 0);
 
-    var visible = tab === 'all' ? devices : devices.filter(function (d) { return d.status === tab; });
+    var badgeFor = function (d) {
+      if (d.connecting) return ['syncing', 'Connecting'];
+      if (d.progress) return ['syncing', (d.progress.paused ? 'Paused ' : d.progress.kind === 'pull' ? 'Pulling ' : 'Syncing ') + d.progress.pct + '%'];
+      if (d.queued) return ['online', 'Online · queued'];
+      if (d.status === 'fault') return ['fault', 'Fault · ' + d.fault];
+      if (d.status === 'online' && !d.autoSync) return ['online', 'Online · auto sync off'];
+      return [d.status, ''];
+    };
+
+    // ---- Device list: tabs + filters + sort ----
+    var visible = devices.filter(function (d) {
+      if (tab === 'syncing') { if (!d.progress) return false; }
+      else if (tab !== 'all' && d.status !== tab) return false;
+      if (!matchQ(fdevCur.q, [d.id, d.name, d.host, d.addr])) return false;
+      if (fdevCur.site !== 'any' && d.site !== fdevCur.site) return false;
+      if (fdevCur.fw === 'current' && d.fw !== '2.4.1') return false;
+      if (fdevCur.fw === 'outdated' && d.fw === '2.4.1') return false;
+      var usedPct = d.usedBytes / d.totalBytes;
+      if (fdevCur.storage === '75' && usedPct < 0.75) return false;
+      if (fdevCur.storage === '90' && usedPct < 0.9) return false;
+      if (fdevCur.storage === 'under50' && usedPct >= 0.5) return false;
+      if (fdevCur.pending === 'some' && d.pending === 0) return false;
+      if (fdevCur.pending === 'none' && d.pending > 0) return false;
+      if (fdevCur.auto === 'on' && !d.autoSync) return false;
+      if (fdevCur.auto === 'off' && d.autoSync) return false;
+      return true;
+    });
+    var statusRank = { fault: 0, offline: 1, syncing: 2, connecting: 3, online: 4 };
+    visible.sort(function (a, b) {
+      switch (fdevCur.sort) {
+        case 'name': return a.name.localeCompare(b.name);
+        case 'pending': return b.pending - a.pending || a.id.localeCompare(b.id);
+        case 'used': return (b.usedBytes / b.totalBytes) - (a.usedBytes / a.totalBytes);
+        case 'status': return (statusRank[a.status] - statusRank[b.status]) || a.id.localeCompare(b.id);
+        default: return a.id.localeCompare(b.id);
+      }
+    });
+    var siteOptions = [{ value: 'any', label: 'Any site' }];
+    devices.map(function (d) { return d.site; }).filter(function (x, i, arr) { return arr.indexOf(x) === i; }).sort().forEach(function (sname) { siteOptions.push({ value: sname, label: sname }); });
+    var fdev = mkFilter('dev', {
+      q: null,
+      site: siteOptions,
+      fw: [{ value: 'any', label: 'Any version' }, { value: 'current', label: 'Current (2.4.1)' }, { value: 'outdated', label: 'Needs update' }],
+      storage: [{ value: 'any', label: 'Any' }, { value: 'under50', label: 'Under 50% used' }, { value: '75', label: 'Over 75% used' }, { value: '90', label: 'Over 90% used' }],
+      pending: [{ value: 'any', label: 'Any' }, { value: 'some', label: 'Has pending files' }, { value: 'none', label: 'Nothing pending' }],
+      auto: [{ value: 'any', label: 'Any' }, { value: 'on', label: 'Enabled' }, { value: 'off', label: 'Paused' }],
+      sort: [{ value: 'id', label: 'Device ID' }, { value: 'name', label: 'Name' }, { value: 'status', label: 'Status (worst first)' }, { value: 'pending', label: 'Most pending' }, { value: 'used', label: 'Fullest storage' }]
+    });
+
     var selectedId = s.selected || 'FIELD-12';
-    var selDev = devices.filter(function (d) { return d.id === selectedId; })[0] || devices[0];
+    var selDev = byId[selectedId] || visible[0] || devices[0];
+    var openDevice = function (id) { self.setState({ screen: 'device', deviceId: id, deviceTab: 'overview', draft: null, connTest: null, removeOpen: false }); };
+    var showFilesFor = function (id, path) {
+      var next = copy(filters); var cur = copy(fget('files')); cur.device = id; next.files = cur;
+      var fo = copy(filterOpen); fo.files = true;
+      var st = { screen: 'files', filters: next, filterOpen: fo, fileTab: 'all' };
+      if (path) st.selectedFile = path;
+      self.setState(st);
+    };
 
     var deviceRows = visible.map(function (d) {
-      return { id: d.id, name: d.name, status: d.status, fault: d.fault, used: self.fmtGB(d.usedBytes), pending: d.pending, mount: d.mount, seen: d.lastSync };
+      var b = badgeFor(d);
+      return { id: d.id, name: d.name, status: d.status, used: self.fmtGB(d.usedBytes), pending: d.pending, site: d.site, seen: d.lastSync,
+        badgeStatus: b[0], badgeText: b[1] || undefined, pct: d.progress ? d.progress.pct : null, live: !!d.progress && !d.progress.paused, open: function () { openDevice(d.id); } };
     });
     var deviceColumns = [
       { key: 'id', label: 'Device', width: 150 },
       { key: 'name', label: 'Name' },
-      { key: 'status', label: 'Status', render: function (r) { return el('StatusBadge', { status: r.status }, r.fault ? 'Fault · ' + r.fault : undefined) || r.status.toUpperCase(); } },
+      { key: 'status', label: 'Status', width: 170, render: function (r) {
+        var badge = el('StatusBadge', { status: r.badgeStatus }, r.badgeText) || (r.badgeText || r.status.toUpperCase());
+        if (r.pct == null || !R) return badge;
+        return R.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, width: 150 } }, badge, el('Meter', { value: r.pct, max: 100, segments: 15, live: r.live, label: '' }));
+      } },
       { key: 'used', label: 'Used', align: 'right' },
       { key: 'pending', label: 'Pending', align: 'right' },
-      { key: 'mount', label: 'Mount', muted: true },
       { key: 'seen', label: 'Last sync', align: 'right', muted: true },
-      { key: 'refresh', label: '', align: 'right', render: function (r) { return el('Button', { size: 'small', variant: 'ghost', icon: 'refresh-cw', 'aria-label': 'Refresh ' + r.id }, 'Refresh') || 'Refresh'; } }
+      { key: 'open', label: '', align: 'right', render: function (r) { return el('Button', { size: 'small', variant: 'ghost', icon: 'chevron-right', 'aria-label': 'Open ' + r.id, onClick: function (e) { e.stopPropagation(); r.open(); } }) || 'Open'; } }
     ];
 
     var log = this.serverLog();
+    if (pull) {
+      log = log.concat([{ id: 10, time: '14:02:51', level: 'info', message: 'Pull started: ' + targets.length + ' devices, ' + targets.reduce(function (n, d) { return n + d.pending; }, 0) + ' files queued.' }]);
+      targets.forEach(function (d, i) { var v = byId[d.id]; if (v.pulled) log.push({ id: 20 + i, time: '14:03:' + (10 + i * 9), level: 'ok', source: d.id, message: 'Pull complete: ' + d.pending + ' new files (' + self.fmtB(d.pendingBytes) + ').' }); });
+    }
+
+    var setSyncClock = function (id, patch) {
+      var next = copy(syncClocks);
+      var c = copy(next[id] || { start: 0, pausedAt: null });
+      for (var k in patch) c[k] = patch[k];
+      next[id] = c; self.setState({ sync: next });
+    };
+    var txFor = function (d) {
+      var pr = d.progress;
+      if (!pr) return { kicker: '', rate: '', current: '', curPct: 0, curPctText: '', curSize: '', done: 0, total: 1, filesText: '', bytesText: '', remaining: '', eta: '', live: false, paused: false, pause: null, resume: null, stop: null };
+      return {
+        kicker: pr.paused ? 'Transfer paused' : (pr.kind === 'pull' ? 'Pull in progress' : 'Sync in progress'),
+        rate: pr.paused ? 'paused' : self.fmtRate(pr.rate),
+        current: pr.current,
+        curPct: pr.curPct, curPctText: pr.curPct + '%', curSize: 'of ' + self.fmtB(pr.currentBytes),
+        done: pr.done, total: pr.total, filesText: pr.filesDone + ' of ' + pr.files, bytesText: '· ' + self.fmtB(pr.done) + ' of ' + self.fmtB(pr.total),
+        remaining: (pr.files - pr.filesDone) + ' files · ' + self.fmtB(pr.total - pr.done),
+        eta: pr.paused ? '— (paused)' : self.fmtEta(pr.eta),
+        live: !pr.paused, paused: pr.paused,
+        pause: pr.kind === 'pull' ? function () { self.setState({ pull: { start: pull.start, pausedAt: tick } }); } : function () { setSyncClock(d.id, { pausedAt: tick }); },
+        resume: pr.kind === 'pull' ? function () { self.setState({ pull: { start: pull.start + (tick - pull.pausedAt), pausedAt: null } }); } : function () { var c = syncClocks[d.id] || { start: 0, pausedAt: null }; setSyncClock(d.id, { start: c.start + (tick - c.pausedAt), pausedAt: null }); },
+        stop: pr.kind === 'pull' ? function () { self.setState({ pull: null }); } : function () { var c = syncClocks[d.id] || { start: 0, pausedAt: null }; setSyncClock(d.id, { stopped: self.elapsed(c, tick) }); }
+      };
+    };
+    var startPull = function () { self.setState({ pull: { start: tick, pausedAt: null }, pullApplied: false }); };
     var sel = {
-      device: { id: selDev.id, name: selDev.name, status: selDev.status, usedBytes: selDev.usedBytes, totalBytes: selDev.totalBytes, lastSync: selDev.lastSync, pending: selDev.pending },
+      device: { id: selDev.id, name: selDev.name, status: selDev.status === 'connecting' ? 'syncing' : selDev.status, usedBytes: selDev.usedBytes, totalBytes: selDev.totalBytes, lastSync: selDev.lastSync, pending: selDev.pending },
       actions: [
         el('Button', { key: 'r', size: 'small', variant: 'ghost', icon: 'refresh-cw' }, 'Refresh'),
-        el('Button', { key: 'p', size: 'small', variant: 'ghost', icon: 'cloud-download' }, 'Pull'),
-        el('Button', { key: 'u', size: 'small', icon: 'unplug' }, 'Unmount')
+        el('Button', { key: 'p', size: 'small', variant: 'ghost', icon: 'cloud-download', disabled: !!selDev.progress || selDev.status !== 'online' || selDev.pending === 0 || !!pull, onClick: startPull }, 'Pull'),
+        el('Button', { key: 'u', size: 'small', icon: 'unplug', disabled: !!selDev.progress || selDev.status !== 'online' }, 'Unmount')
       ].filter(Boolean),
-      mount: selDev.mount, addr: selDev.addr, fw: selDev.fw, uptime: selDev.uptime, fs: selDev.fs,
+      inProgress: !!selDev.progress,
+      tx: txFor(selDev),
+      host: selDev.host, addr: selDev.addr, mount: selDev.mount, fw: selDev.fw,
+      autoText: selDev.autoSync ? 'every ' + self.fmtDur(Number(selDev.cfg.interval)) : 'paused',
       free: this.fmtGB(selDev.totalBytes - selDev.usedBytes) + ' of ' + this.fmtGB(selDev.totalBytes),
       lastFile: selDev.lastFile,
-      logTitle: selDev.id + ' · log',
-      log: log.filter(function (e) { return e.source === selDev.id; })
+      showFiles: function () { showFilesFor(selDev.id, null); },
+      openDevice: function () { openDevice(selDev.id); }
     };
 
-    var files = this.files();
-    var fileRows = fileTab === 'all' ? files : files.filter(function (f) { return f.state === fileTab; });
-    var pendingShown = files.filter(function (f) { return f.state === 'pending'; }).length;
-    var fileCaption = fileTab === 'pending' ? ('Showing ' + pendingShown + ' of ' + pending + ' pending files') : (fileRows.length + ' files');
+    // ---- Pull strip ----
+    var pullDevices = targets.map(function (d) {
+      var v = byId[d.id];
+      var text = v.pulled ? 'done · ' + d.pending + (d.pending === 1 ? ' file' : ' files') : v.progress ? (v.progress.paused ? 'paused ' : '') + v.progress.pct + '% · ' + v.progress.current : 'queued';
+      return { id: d.id, text: text, color: v.pulled ? 'var(--ink-muted)' : v.progress ? 'var(--phosphor)' : 'var(--ink)' };
+    });
+    var pullTotalBytes = targets.reduce(function (n, d) { return n + d.pendingBytes; }, 0);
+    var pullTotalFiles = targets.reduce(function (n, d) { return n + d.pending; }, 0);
+    var pullDoneBytes = targets.reduce(function (n, d) { var v = byId[d.id]; return n + (v.pulled ? d.pendingBytes : v.progress ? v.progress.done : 0); }, 0);
+    var pullDoneFiles = targets.reduce(function (n, d) { var v = byId[d.id]; return n + (v.pulled ? d.pending : v.progress ? v.progress.filesDone : 0); }, 0);
+    var pullDevicesDone = targets.filter(function (d) { return byId[d.id].pulled; }).length;
+    var pullRate = targets.reduce(function (n, d) { var v = byId[d.id]; return n + (v.progress && !v.progress.paused ? v.progress.rate : 0); }, 0);
+    var skipped = base.filter(function (d) { return d.pending > 0 && d.status !== 'online' && !d.transfer; }).map(function (d) { return d.id + ' (' + (d.status === 'fault' ? 'fault · ' + d.fault : d.status) + ')'; });
+    var pullVals = {
+      idle: !pull, running: pullRunning, active: pullRunning && !pullPaused, paused: pullPaused, done: pullDone, visible: !!pull,
+      kicker: pullDone ? 'Pull complete' : pullPaused ? 'Pull paused' : 'Pull in progress',
+      line: pullDone
+        ? pullTotalFiles + ' files (' + self.fmtB(pullTotalBytes) + ') from ' + targets.length + ' devices in ' + PULL_SECS + ' s.'
+        : pullDevicesDone + ' of ' + targets.length + ' devices · ' + pullDoneFiles + ' of ' + pullTotalFiles + ' files · ' + (pullPaused ? 'paused' : self.fmtRate(pullRate) + ' · ETA ' + self.fmtEta((1 - pullT) * PULL_SECS)),
+      buttonText: pullPaused ? 'Paused · ' + Math.round(pullT * 100) + '%' : 'Pulling · ' + Math.round(pullT * 100) + '%',
+      doneBytes: pullDoneBytes, totalBytes: Math.max(1, pullTotalBytes), doneText: self.fmtB(pullDoneBytes), totalText: 'of ' + self.fmtB(pullTotalBytes),
+      devices: pullDevices,
+      skipped: skipped.length ? 'Skipped: ' + skipped.join(', ') : '',
+      start: startPull,
+      pause: function () { self.setState({ pull: { start: pull.start, pausedAt: tick } }); },
+      resume: function () { self.setState({ pull: { start: pull.start + (tick - pull.pausedAt), pausedAt: null } }); },
+      cancel: function () { self.setState({ pull: null }); },
+      dismiss: function () { self.setState({ pull: null, pullApplied: true }); }
+    };
+
+    // ---- Files ----
+    var kindWord = { video: 'Video', audio: 'Audio', image: 'Image', doc: 'Document', data: 'Data' };
+    var files = this.files().filter(function (f) { return !removed[f.device]; }).map(function (f) {
+      var v = copy(f);
+      var dv = byId[f.device] || {};
+      v.pct = null;
+      if (f.state === 'pulling') {
+        if (dv.progress) { v.pct = dv.progress.curPct; v.state = dv.progress.paused ? 'paused' : 'pulling'; }
+        else if (dv.stopped) { v.state = 'pending'; }
+        else { v.state = 'pulled'; }
+      } else if (f.state === 'pending' && targetIndex[f.device] != null) {
+        if (dv.pulled) v.state = 'pulled';
+        else if (dv.progress) { v.pct = dv.progress.pct; v.state = dv.progress.paused ? 'paused' : 'pulling'; }
+        else if (dv.queued) v.state = 'queued';
+      }
+      v.name = f.path.split('/').pop();
+      v.type = f.path.split('.').pop().toUpperCase();
+      v.size = self.fmtB(f.bytes);
+      v.modified = self.modifiedText(f.at);
+      v.modifiedFull = f.at.replace('T', ' ');
+      v.deviceName = dv.name || f.device;
+      v.epoch = self.epoch(f.at);
+      var map = { pulled: ['online', 'Pulled'], pending: ['offline', 'Pending'], queued: ['offline', 'Queued'], pulling: ['syncing', 'Pulling ' + v.pct + '%'], paused: ['syncing', 'Paused ' + v.pct + '%'], failed: ['fault', 'Failed · ' + f.reason] }[v.state];
+      v.badgeStatus = map[0]; v.badgeText = map[1]; v.live = v.state === 'pulling';
+      v.stateColor = v.state === 'pulled' ? 'var(--phosphor)' : (v.state === 'pulling' || v.state === 'paused') ? 'var(--ink)' : 'var(--ink-muted)';
+      v.avail = v.state === 'pulled' ? 1 : (v.state === 'pulling' || v.state === 'paused') ? v.pct / 100 : 0;
+      return v;
+    });
+    var fileCounts = { pending: 0, inflight: 0, pulled: 0, failed: 0 };
+    files.forEach(function (f) { if (f.state === 'pending' || f.state === 'queued') fileCounts.pending++; else if (f.state === 'pulling' || f.state === 'paused') fileCounts.inflight++; else if (f.state === 'pulled') fileCounts.pulled++; else fileCounts.failed++; });
+    var sizeOk = function (sel, bytes) { if (sel === 'any') return true; if (sel === 'small') return bytes < 10e6; if (sel === '10') return bytes >= 10e6; if (sel === '100') return bytes >= 100e6; if (sel === '1000') return bytes >= 1e9; return true; };
+    var fileRows = files.filter(function (f) {
+      if (fileTab === 'pending') { if (!(f.state === 'pending' || f.state === 'queued')) return false; }
+      else if (fileTab === 'inflight') { if (!(f.state === 'pulling' || f.state === 'paused')) return false; }
+      else if (fileTab !== 'all' && f.state !== fileTab) return false;
+      if (!matchQ(ffilesCur.q, [f.name, f.path, f.device])) return false;
+      if (ffilesCur.device !== 'any' && f.device !== ffilesCur.device) return false;
+      if (ffilesCur.type !== 'any' && f.kind !== ffilesCur.type) return false;
+      if (!dateOk(ffilesCur.date, f.at)) return false;
+      if (!sizeOk(ffilesCur.size, f.bytes)) return false;
+      return true;
+    });
+    fileRows.sort(function (a, b) {
+      switch (ffilesCur.sort) {
+        case 'oldest': return a.epoch - b.epoch;
+        case 'largest': return b.bytes - a.bytes;
+        case 'name': return a.name.localeCompare(b.name);
+        case 'device': return a.device.localeCompare(b.device) || b.epoch - a.epoch;
+        default: return b.epoch - a.epoch;
+      }
+    });
+    var deviceOptions = [{ value: 'any', label: 'Any device' }].concat(devices.map(function (d) { return { value: d.id, label: d.id, hint: d.name }; }));
+    var dateOptions = [{ value: 'any', label: 'Any time' }, { value: 'today', label: 'Today' }, { value: 'yesterday', label: 'Yesterday' }, { value: 'week', label: 'Last 7 days' }];
+    var ffiles = mkFilter('files', {
+      q: null,
+      device: deviceOptions,
+      type: [{ value: 'any', label: 'Any type' }, { value: 'video', label: 'Video' }, { value: 'audio', label: 'Audio' }, { value: 'image', label: 'Images' }, { value: 'doc', label: 'Documents' }, { value: 'data', label: 'Data' }],
+      date: dateOptions,
+      size: [{ value: 'any', label: 'Any size' }, { value: 'small', label: 'Under 10 MB' }, { value: '10', label: 'Over 10 MB' }, { value: '100', label: 'Over 100 MB' }, { value: '1000', label: 'Over 1 GB' }],
+      sort: [{ value: 'newest', label: 'Newest first' }, { value: 'oldest', label: 'Oldest first' }, { value: 'largest', label: 'Largest first' }, { value: 'name', label: 'Name' }, { value: 'device', label: 'Device' }]
+    });
+    var fileCaption = fileRows.length + ' of ' + files.length + ' files' + (ffiles.count ? ' · ' + ffiles.count + (ffiles.count === 1 ? ' filter' : ' filters') : '');
     var fileColumns = [
-      { key: 'path', label: 'File' },
-      { key: 'device', label: 'Device', width: 150 },
+      { key: 'name', label: 'File' },
+      { key: 'device', label: 'Device', width: 120 },
       { key: 'size', label: 'Size', align: 'right' },
       { key: 'modified', label: 'Modified', align: 'right', muted: true },
-      { key: 'state', label: 'State', render: function (r) { return r.state.toUpperCase(); } }
+      { key: 'state', label: 'State', width: 150, render: function (r) {
+        var badge = el('StatusBadge', { status: r.badgeStatus }, r.badgeText) || r.badgeText;
+        if (r.pct == null || !R) return badge;
+        return R.createElement('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, width: 130 } }, badge, el('Meter', { value: r.pct, max: 100, segments: 13, live: r.live, label: '' }));
+      } }
     ];
 
+    // ---- Player (shared by the Files preview and the Gallery) ----
+    var playerFor = function (f) {
+      var base0 = { path: f ? f.path : null, pos: 0, playing: false, start: tick, muted: s.player ? !!s.player.muted : false };
+      var pv = (s.player && f && s.player.path === f.path) ? s.player : base0;
+      var dur = f && f.duration ? f.duration : 0;
+      var avail = f ? f.avail : 0;
+      var availSec = dur * avail;
+      var rawPos = pv.playing ? pv.pos + (tick - pv.start) : pv.pos;
+      var pos = Math.max(0, Math.min(rawPos, availSec, dur));
+      var ended = dur > 0 && pos >= dur;
+      var stalled = pv.playing && !ended && pos >= availSec && availSec < dur;
+      var isPlaying = pv.playing && !ended && !stalled;
+      var unavailable = !!f && (f.kind === 'video' || f.kind === 'audio') && avail === 0;
+      var setPlayer = function (patch) { var n = copy(pv); n.path = f ? f.path : null; for (var k in patch) n[k] = patch[k]; self.setState({ player: n }); };
+      var bars = [];
+      if (f && f.kind === 'audio') {
+        var n = 72;
+        for (var b = 0; b < n; b++) {
+          var x = Math.sin(b * 12.9898 + 78.233) * 43758.5453; x = x - Math.floor(x);
+          var y = Math.sin(b * 0.9) * 0.5 + 0.5;
+          var at = b / n;
+          bars.push({ h: Math.round(10 + (x * 0.6 + y * 0.4) * 86), color: at < pos / Math.max(1, dur) ? 'var(--phosphor)' : at < avail ? 'var(--phosphor-dim)' : 'var(--line)' });
+        }
+      }
+      var stamp = f ? self.timeOf(f.at) : '00:00:00';
+      return {
+        isPlaying: isPlaying, notPlaying: !isPlaying,
+        showBigPlay: !isPlaying && !unavailable,
+        unavailable: unavailable,
+        unavailableText: f && f.state === 'queued' ? 'Queued · playback starts once the pull reaches ' + f.device : f && f.state === 'failed' ? 'Not available · pull failed' : 'Not pulled yet · pull the file to preview it',
+        stalled: stalled,
+        stallText: 'Waiting for more of the file · ' + Math.round(avail * 100) + '% pulled',
+        timecode: f && f.kind === 'video' ? self.addClock(stamp, pos) : '',
+        timeText: self.fmtClock(pos) + ' / ' + self.fmtClock(dur),
+        availPct: Math.round(avail * 1000) / 10,
+        playedPct: dur ? Math.round(pos / dur * 1000) / 10 : 0,
+        availText: !f ? '' : avail >= 1 ? 'Playing the pulled copy from ' + f.device + '.' : avail > 0 ? self.fmtClock(availSec) + ' of ' + self.fmtClock(dur) + ' available so far · playback pauses at the pulled edge, then resumes as more arrives.' : '',
+        imageText: f && f.kind === 'image' ? (avail >= 1 ? 'Pulled copy · ' + f.size : avail > 0 ? Math.round(avail * 100) + '% pulled · renders when the file completes' : 'Not pulled yet') : '',
+        toggleLabel: isPlaying ? 'Pause' : 'Play',
+        muteLabel: pv.muted ? 'Unmute' : 'Mute',
+        muted: !!pv.muted, notMuted: !pv.muted,
+        seekLabel: 'Seek · ' + self.fmtClock(pos) + ' of ' + self.fmtClock(dur),
+        bars: bars,
+        toggle: function () {
+          if (unavailable) return;
+          if (isPlaying) setPlayer({ playing: false, pos: pos });
+          else if (ended) setPlayer({ playing: true, pos: 0, start: tick });
+          else setPlayer({ playing: true, pos: Math.min(pos, availSec), start: tick });
+        },
+        back: function () { setPlayer({ pos: Math.max(0, pos - 10), start: tick }); },
+        fwd: function () { setPlayer({ pos: Math.min(availSec, pos + 10), start: tick }); },
+        seek: function (e) {
+          var rect = e.currentTarget.getBoundingClientRect();
+          var frac = Math.max(0, Math.min(1, (e.clientX - rect.left) / Math.max(1, rect.width)));
+          setPlayer({ pos: Math.min(availSec, frac * dur), start: tick });
+        },
+        mute: function () { setPlayer({ muted: !pv.muted }); }
+      };
+    };
+    var fileByPath = {};
+    files.forEach(function (f) { fileByPath[f.path] = f; });
+
+    // ---- Files page preview pane ----
+    var selectedPath = s.selectedFile === undefined ? '/mnt/usb0/cam/gate04_1344.mp4' : s.selectedFile;
+    var selFile = selectedPath ? fileByPath[selectedPath] || null : null;
+    var extraFor = function (f) {
+      if (f.kind === 'video') return ['Video', self.fmtClock(f.duration) + ' · ' + f.res + ' · ' + f.fps + ' fps'];
+      if (f.kind === 'audio') return ['Duration', self.fmtClock(f.duration)];
+      if (f.kind === 'image') return ['Dimensions', f.dims];
+      if (f.kind === 'doc') return ['Pages', String(f.pages)];
+      return ['Rows', f.rows];
+    };
+    var emptyFile = { open: false, cantDownload: true, isVideo: false, isAudio: false, isImage: false, isOther: false, hasTransport: false, canPull: false, path: '', name: '', size: '', modifiedFull: '', kicker: '', metaLine: '', overlayLeft: '', dims: '', stateText: '', deviceLine: '', extraLabel: '', extraValue: '', noPreview: '', close: null, openDevice: null, openGallery: null };
+    var fileVals = selFile ? {
+      open: true, path: selFile.path, name: selFile.name, size: selFile.size, modifiedFull: selFile.modifiedFull,
+      kicker: kindWord[selFile.kind] + ' · ' + selFile.type,
+      metaLine: selFile.device + ' · ' + selFile.size + ' · ' + selFile.modified,
+      isVideo: selFile.kind === 'video', isAudio: selFile.kind === 'audio', isImage: selFile.kind === 'image', isOther: selFile.kind === 'doc' || selFile.kind === 'data',
+      hasTransport: selFile.kind === 'video' || selFile.kind === 'audio',
+      overlayLeft: selFile.device + ' · ' + selFile.name,
+      dims: selFile.dims || '',
+      stateText: selFile.badgeText,
+      deviceLine: selFile.device + ' · ' + selFile.deviceName,
+      extraLabel: extraFor(selFile)[0], extraValue: extraFor(selFile)[1],
+      noPreview: 'No inline preview for ' + selFile.type + ' files. ' + (selFile.state === 'pulled' ? 'Download to open it.' : 'Pull it first, then download.'),
+      canPull: (selFile.state === 'pending' || selFile.state === 'failed') && !pull,
+      cantDownload: selFile.state !== 'pulled',
+      close: function () { self.setState({ selectedFile: null }); },
+      openDevice: function () { openDevice(selFile.device); },
+      openGallery: function () { self.setState({ screen: 'gallery', galleryFile: selFile.path }); }
+    } : emptyFile;
+    var player = playerFor(selFile);
+
+    // ---- Gallery ----
+    var videos = files.filter(function (f) { return f.kind === 'video'; });
+    var durOk = function (sel, d) { if (sel === 'any') return true; if (sel === 'short') return d < 60; if (sel === 'mid') return d >= 60 && d < 600; if (sel === 'long') return d >= 600; return true; };
+    var galList = videos.filter(function (f) {
+      if (!matchQ(fgalCur.q, [f.name, f.device, f.deviceName])) return false;
+      if (fgalCur.device !== 'any' && f.device !== fgalCur.device) return false;
+      if (!dateOk(fgalCur.date, f.at)) return false;
+      if (!durOk(fgalCur.duration, f.duration)) return false;
+      if (fgalCur.state === 'pulled' && f.state !== 'pulled') return false;
+      if (fgalCur.state === 'inflight' && !(f.state === 'pulling' || f.state === 'paused')) return false;
+      if (fgalCur.state === 'pending' && !(f.state === 'pending' || f.state === 'queued')) return false;
+      return true;
+    });
+    galList.sort(function (a, b) {
+      switch (fgalCur.sort) {
+        case 'oldest': return a.epoch - b.epoch;
+        case 'longest': return b.duration - a.duration;
+        case 'largest': return b.bytes - a.bytes;
+        case 'device': return a.device.localeCompare(b.device) || b.epoch - a.epoch;
+        default: return b.epoch - a.epoch;
+      }
+    });
+    var fgal = mkFilter('gal', {
+      q: null,
+      device: deviceOptions,
+      date: dateOptions,
+      duration: [{ value: 'any', label: 'Any length' }, { value: 'short', label: 'Under 1 min' }, { value: 'mid', label: '1 to 10 min' }, { value: 'long', label: 'Over 10 min' }],
+      state: [{ value: 'any', label: 'Any state' }, { value: 'pulled', label: 'Pulled (playable)' }, { value: 'inflight', label: 'In flight' }, { value: 'pending', label: 'Pending' }],
+      sort: [{ value: 'newest', label: 'Newest first' }, { value: 'oldest', label: 'Oldest first' }, { value: 'longest', label: 'Longest first' }, { value: 'largest', label: 'Largest first' }, { value: 'device', label: 'Device' }]
+    });
+    var galPath = s.galleryFile === undefined ? '/mnt/usb0/cam/gate04_1344.mp4' : s.galleryFile;
+    var galCur = galPath ? fileByPath[galPath] : null;
+    if (galCur && galCur.kind !== 'video') galCur = null;
+    var galIdx = -1;
+    galList.forEach(function (f, i) { if (galCur && f.path === galCur.path) galIdx = i; });
+    var pickGallery = function (path) { self.setState({ galleryFile: path, player: { path: path, pos: 0, playing: false, start: tick, muted: s.player ? !!s.player.muted : false } }); };
+    var galItems = galList.map(function (f) {
+      var cur = galCur && f.path === galCur.path;
+      return { name: f.name, meta: f.device + ' · ' + f.modified, dur: self.fmtClock(f.duration), stateText: f.badgeText, stateColor: f.stateColor,
+        current: cur, domId: cur ? 'vf-gal-cur' : undefined, border: cur ? 'var(--phosphor)' : 'var(--line)', bg: cur ? 'var(--phosphor-soft)' : 'var(--surface)', nameColor: cur ? 'var(--phosphor)' : 'var(--ink)',
+        pick: function () { pickGallery(f.path); } };
+    });
+    var galPlayer = playerFor(galCur);
+    var galDev = galCur ? byId[galCur.device] : null;
+    var galVals = {
+      caption: galList.length + ' of ' + videos.length + ' clips' + (fgal.count ? ' · ' + fgal.count + (fgal.count === 1 ? ' filter' : ' filters') : ''),
+      listEmpty: galList.length === 0,
+      items: galItems,
+      has: !!galCur, none: !galCur,
+      cantDownload: !galCur || galCur.state !== 'pulled',
+      prevDisabled: galIdx <= 0, nextDisabled: galIdx < 0 || galIdx >= galList.length - 1,
+      prev: function () { if (galIdx > 0) pickGallery(galList[galIdx - 1].path); },
+      next: function () { if (galIdx >= 0 && galIdx < galList.length - 1) pickGallery(galList[galIdx + 1].path); },
+      player: galPlayer,
+      cur: galCur ? {
+        name: galCur.name, path: galCur.path, size: galCur.size,
+        kicker: galCur.device + ' · ' + galCur.deviceName + ' · ' + galCur.modifiedFull,
+        overlayLeft: galCur.device + ' · ' + galCur.name,
+        resLine: galCur.res + ' · ' + galCur.fps + ' fps',
+        badgeStatus: galCur.badgeStatus, badgeText: galCur.badgeText,
+        deviceLine: galCur.device + ' · ' + galCur.deviceName,
+        recorded: galCur.modifiedFull,
+        duration: self.fmtClock(galCur.duration) + ' (' + self.fmtDur(galCur.duration) + ')',
+        video: galCur.res + ' · ' + galCur.fps + ' fps · ' + Math.round(galCur.bytes * 8 / galCur.duration / 1e6 * 10) / 10 + ' Mb/s',
+        serverPath: '/var/lib/usbcloud/store/' + galCur.device + '/' + galCur.name,
+        canPull: (galCur.state === 'pending' || galCur.state === 'failed') && !pull,
+        deviceStatusLine: galDev ? (galDev.name + ' · ' + badgeFor(galDev)[0].toUpperCase() + (badgeFor(galDev)[1] ? ' · ' + badgeFor(galDev)[1] : '') + ' · last sync ' + galDev.lastSync) : '',
+        deviceStorageLine: galDev ? (self.fmtGB(galDev.usedBytes) + ' of ' + self.fmtGB(galDev.totalBytes) + ' used · ' + galDev.pending + ' pending') : '',
+        openDevice: function () { openDevice(galCur.device); },
+        openFiles: function () { showFilesFor(galCur.device, galCur.path); }
+      } : { name: '', path: '', size: '', kicker: '', overlayLeft: '', resLine: '', badgeStatus: 'offline', badgeText: '', deviceLine: '', recorded: '', duration: '', video: '', serverPath: '', canPull: false, deviceStatusLine: '', deviceStorageLine: '', openDevice: null, openFiles: null },
+    };
+
+    // ---- Device detail ----
+    var INTERVALS = [{ value: '30', label: 'Every 30 s' }, { value: '60', label: 'Every minute' }, { value: '300', label: 'Every 5 min' }, { value: '900', label: 'Every 15 min' }, { value: '3600', label: 'Every hour' }, { value: '21600', label: 'Every 6 h' }];
+    var BANDWIDTHS = [{ value: '0', label: 'Unlimited' }, { value: '0.5', label: '500 KB/s' }, { value: '1', label: '1 MB/s' }, { value: '2', label: '2 MB/s' }, { value: '5', label: '5 MB/s' }, { value: '10', label: '10 MB/s' }, { value: '25', label: '25 MB/s' }];
+    var SNAPSHOTS = [{ value: '60', label: '1 min' }, { value: '300', label: '5 min' }, { value: '900', label: '15 min' }, { value: '1800', label: '30 min' }, { value: '3600', label: '1 h' }];
+    var DELAYS = [{ value: '5', label: '5 s' }, { value: '15', label: '15 s' }, { value: '30', label: '30 s' }, { value: '60', label: '1 min' }, { value: '300', label: '5 min' }];
+    var labelOf = function (opts, v) { for (var i = 0; i < opts.length; i++) if (opts[i].value === String(v)) return opts[i].label; return String(v); };
+    var dd = byId[s.deviceId] || selDev;
+    var ddBase = base.filter(function (d) { return d.id === dd.id; })[0] || dd;
+    var deviceTab = s.deviceTab || 'overview';
+    var saved = settings[dd.id] || self.defaultCfg(ddBase);
+    var draft = (s.draft && s.draft.id === dd.id) ? s.draft : null;
+    var cur = draft || saved;
+    var dirty = false;
+    if (draft) for (var dk in saved) if (String(saved[dk]) !== String(draft[dk])) dirty = true;
+    var field = function (key) {
+      return { v: cur[key], set: function (e) {
+        var val = (e && e.target) ? (e.target.type === 'checkbox' ? e.target.checked : e.target.value) : e;
+        var n = copy(cur); n[key] = val; n.id = dd.id; self.setState({ draft: n });
+      } };
+    };
+    var autoField = field('autoSync');
+    var cfgVals = {
+      name: field('name'), host: field('host'), port: field('port'), user: field('user'),
+      autoSync: { v: cur.autoSync !== false, off: cur.autoSync === false, text: cur.autoSync !== false ? 'Scheduled clip retrieval runs on the interval below.' : 'Paused · clips stay on the device until a manual pull.', toggle: function () { autoField.set(cur.autoSync === false); } },
+      interval: { v: String(cur.interval), options: INTERVALS, set: field('interval').set },
+      bandwidth: { v: String(cur.bandwidth), options: BANDWIDTHS, set: field('bandwidth').set },
+      snapshot: { v: String(cur.snapshotTimeout), options: SNAPSHOTS, set: field('snapshotTimeout').set },
+      retryCount: field('retryCount'),
+      retryDelay: { v: String(cur.retryDelay), options: DELAYS, set: field('retryDelay').set },
+      syncHint: (cur.autoSync !== false ? 'Checks for new clips ' + labelOf(INTERVALS, cur.interval).toLowerCase() + '; ' : 'Automatic sync is paused; ') + (String(cur.bandwidth) === '0' ? 'transfers use the full link.' : 'transfers are capped at ' + labelOf(BANDWIDTHS, cur.bandwidth) + '.'),
+      retryHint: String(cur.retryCount) === '0' ? 'A failed connection or transfer is logged and left for the next sync.' : 'After a failed connection or transfer the server tries again up to ' + cur.retryCount + (String(cur.retryCount) === '1' ? ' time' : ' times') + ', ' + labelOf(DELAYS, cur.retryDelay) + ' apart.'
+    };
+    var savedRecently = s.savedId === dd.id && s.savedAt != null && tick - s.savedAt < 8;
+    var ct = (s.connTest && s.connTest.id === dd.id) ? s.connTest : null;
+    var ctRunning = !!ct && tick - ct.start < 3;
+    var ctResult = ct && !ctRunning ? (ddBase.status === 'offline' ? { ok: false, text: 'No route to ' + cur.user + '@' + cur.host + ':' + cur.port + ' · timed out after 5 s' } : ddBase.status === 'fault' ? { ok: true, text: 'Reached ' + cur.user + '@' + cur.host + ':' + cur.port + ' in ' + (18 + dd.id.length * 3) + ' ms · agent ' + dd.fw + ' · drive reports EBUSY' } : { ok: true, text: 'Reached ' + cur.user + '@' + cur.host + ':' + cur.port + ' in ' + (18 + dd.id.length * 3) + ' ms · agent ' + dd.fw + ' · ' + dd.model }) : null;
+    var ddBadge = badgeFor(dd);
+    var usedPct = Math.round(dd.usedBytes / dd.totalBytes * 100);
+    var nextIn = dd.autoSync ? Number(saved.interval) - ((tick + 17) % Number(saved.interval)) : null;
+    var snapshotText = dd.progress ? 'Open ' + self.fmtClock(dd.progress.openFor) + ' · closes after ' + labelOf(SNAPSHOTS, saved.snapshotTimeout) + ' idle' : dd.status === 'fault' ? 'Cannot open · drive busy' : dd.connecting ? 'Not yet opened' : 'Closed · limit ' + labelOf(SNAPSHOTS, saved.snapshotTimeout);
+    var devVals = {
+      id: dd.id, name: dd.name, crumbs: ['USBCloud', 'Fleet', dd.id],
+      tabs: [{ id: 'overview', label: 'Overview' }, { id: 'files', label: 'Files', count: files.filter(function (f) { return f.device === dd.id; }).length }, { id: 'log', label: 'Log' }, { id: 'settings', label: 'Settings' }],
+      tab: deviceTab, setTab: function (id) { self.setState({ deviceTab: id }); },
+      isOverview: deviceTab === 'overview', isFiles: deviceTab === 'files', isLog: deviceTab === 'log', isSettings: deviceTab === 'settings',
+      back: function () { self.setState({ screen: 'devices', selected: dd.id }); },
+      busy: !!dd.progress || dd.status !== 'online',
+      pullDisabled: !!dd.progress || dd.status !== 'online' || !!pull || dd.pending === 0,
+      pullLabel: dd.progress ? 'Transferring' : dd.pending === 0 ? 'Nothing to pull' : 'Pull now',
+      pullNow: startPull,
+      badgeStatus: ddBadge[0], badgeText: ddBadge[1] || { online: 'Online', syncing: 'Syncing', offline: 'Offline', fault: 'Fault' }[ddBadge[0]] || ddBadge[0],
+      snapshotText: snapshotText,
+      autoText: dd.autoSync ? labelOf(INTERVALS, saved.interval) : 'Paused',
+      nextSyncText: dd.progress ? 'running now' : dd.autoSync ? 'in ' + self.fmtEta(nextIn) : 'manual only',
+      lastSync: dd.lastSync,
+      connText: cur.user + '@' + dd.host + ':' + cur.port,
+      sshText: 'port ' + cur.port + ' · user ' + cur.user + ' · key auth',
+      usedBytes: dd.usedBytes, totalBytes: dd.totalBytes, usedText: self.fmtGB(dd.usedBytes), totalText: '/ ' + self.fmtGB(dd.totalBytes) + ' · ' + usedPct + '%',
+      freeText: self.fmtGB(dd.totalBytes - dd.usedBytes), fs: dd.fs, mount: dd.mount,
+      pendingText: dd.pending + (dd.pending === 1 ? ' file' : ' files') + (dd.queued ? ' · queued for pull' : ''),
+      lastFile: dd.lastFile,
+      inProgress: !!dd.progress, idle: !dd.progress, tx: txFor(dd),
+      idleText: dd.connecting ? 'Pairing · installing the server key and waiting for the agent.' : dd.status === 'offline' ? 'Unreachable · ' + dd.pending + ' files waiting on the device.' : dd.status === 'fault' ? 'Blocked · the drive could not be mounted (EBUSY).' : dd.pending > 0 ? 'Idle · ' + dd.pending + ' new files waiting for the next sync.' : 'Idle · nothing new since ' + dd.lastSync + '.',
+      bandwidthText: labelOf(BANDWIDTHS, saved.bandwidth),
+      retryText: String(saved.retryCount) === '0' ? 'none' : saved.retryCount + ' × ' + labelOf(DELAYS, saved.retryDelay),
+      host: dd.host, addr: dd.addr, model: dd.model, fwText: 'USBCloud agent ' + dd.fw + (dd.fw === '2.4.1' ? '' : ' · update available'), uptime: dd.uptime, site: dd.site,
+      recentCaption: 'Recent files · ' + dd.id, recentRows: fileRows.filter(function (f) { return f.device === dd.id; }).slice(0, 6),
+      allRows: files.filter(function (f) { return f.device === dd.id; }).sort(function (a, b) { return b.epoch - a.epoch; }),
+      filesCaption: files.filter(function (f) { return f.device === dd.id; }).length + ' files from ' + dd.id,
+      selectFile: function (r) { showFilesFor(dd.id, r.path); },
+      logTitle: dd.id + ' · log', logEntries: self.deviceLog(dd), logHeightSmall: 300, logHeightTall: 560,
+      cfg: cfgVals,
+      idLine: 'Device ID ' + dd.id + ' · assigned at pairing and used for the server folder /var/lib/usbcloud/store/' + dd.id,
+      clean: !dirty, saveColor: savedRecently ? 'var(--phosphor)' : 'var(--ink-muted)',
+      saveText: dirty ? 'Unsaved changes' : savedRecently ? 'Saved · applies from the next sync' : '',
+      save: function () { var all = copy(settings); var n = copy(cur); delete n.id; all[dd.id] = n; self.setState({ deviceSettings: all, draft: null, savedAt: tick, savedId: dd.id }); },
+      discard: function () { self.setState({ draft: null }); },
+      test: { idle: !ctRunning, running: ctRunning, run: function () { self.setState({ connTest: { id: dd.id, start: tick } }); },
+        text: ctRunning ? 'Opening an SSH session to ' + cur.host + '…' : ctResult ? ctResult.text : '', color: ctResult && !ctResult.ok ? 'var(--ink)' : ctResult ? 'var(--phosphor)' : 'var(--ink-muted)' },
+      removeOpen: !!s.removeOpen, openRemove: function () { self.setState({ removeOpen: true }); }, removeClose: function () { self.setState({ removeOpen: false }); },
+      removeTitle: 'Remove ' + dd.name + '?',
+      removeBody: dd.id + ' (' + dd.host + ') will be taken out of the fleet' + (dd.pending > 0 ? ', leaving ' + dd.pending + ' files unpulled on the device.' : '.'),
+      removeActions: [
+        el('Button', { key: 'c', variant: 'ghost', onClick: function () { self.setState({ removeOpen: false }); } }, 'Keep device'),
+        el('Button', { key: 'r', variant: 'inverse', icon: 'trash-2', onClick: function () { var rm = copy(removed); rm[dd.id] = true; self.setState({ removed: rm, removeOpen: false, screen: 'devices', selected: null }); } }, 'Remove device')
+      ].filter(Boolean)
+    };
+
+    // ---- Add device dialog ----
+    var addOpen = !!s.addOpen;
+    var scan = s.scan || null;
+    var scanElapsed = scan ? tick - scan.start : 0;
+    var scanning = !!scan && scanElapsed < 5;
+    var disc = this.discovered();
+    var foundCount = scan ? (scanning ? Math.min(disc.length, Math.floor(scanElapsed * 0.9)) : disc.length) : 0;
+    var addedByAddr = {};
+    (s.addedDevices || []).forEach(function (d) { addedByAddr[d.addr] = d.id; });
+    var knownByAddr = {};
+    base.forEach(function (d) { knownByAddr[d.addr] = d.id; });
+    var found = disc.slice(0, foundCount).map(function (f) {
+      var known = knownByAddr[f.addr] || addedByAddr[f.addr] || null;
+      var outdated = f.fw !== '2.4.1';
+      return { host: f.host, meta: f.addr + ' · ' + f.model + ' · agent ' + f.fw, known: !!known, canAdd: !known,
+        note: known ? 'In fleet as ' + known : outdated ? 'Agent update available' : 'New',
+        noteColor: known ? 'var(--ink-faint)' : outdated ? 'var(--ink)' : 'var(--phosphor)',
+        add: function () { self.completeAdd({ host: f.host, addr: f.addr, port: '22', user: 'pi', name: '', model: f.model, fw: f.fw }); },
+        open: function () { self.setState({ addOpen: false }); openDevice(known); } };
+    });
+    var addForm = s.addForm || { host: '', port: '22', user: 'pi', name: '' };
+    var formField = function (key) { return { v: addForm[key], set: function (e) { var n = copy(addForm); n[key] = e && e.target ? e.target.value : e; self.setState({ addForm: n, addHostError: false }); } }; };
+    var addTest = s.addTest || null;
+    var connecting = !!addTest;
+    var addResult = s.addResult && tick - s.addResult.at < 12 ? s.addResult : null;
+    var addVals = {
+      open: addOpen,
+      openDialog: function () { self.setState({ addOpen: true, scan: { start: tick }, addResult: null, addHostError: false }); },
+      close: function () { self.setState({ addOpen: false, addTest: null }); },
+      actions: [el('Button', { key: 'd', variant: 'ghost', onClick: function () { self.setState({ addOpen: false, addTest: null }); } }, 'Done')].filter(Boolean),
+      scanning: scanning, scanIdle: !scanning,
+      scanText: scanning ? 'Listening for _usbcloud._tcp on 10.0.0.0/16 · ' + foundCount + ' found' : found.length + ' clients answered · ' + found.filter(function (f) { return f.canAdd; }).length + ' not yet in the fleet',
+      rescan: function () { self.setState({ scan: { start: tick } }); },
+      noneFound: found.length === 0,
+      found: found,
+      form: { host: formField('host'), name: formField('name'), port: formField('port'), user: formField('user'), hostError: s.addHostError ? 'Enter a hostname or IP address.' : undefined },
+      connecting: connecting, connectingText: 'Connecting to ' + (addTest ? addTest.host : '') + '…',
+      canSubmit: !connecting,
+      submit: function () {
+        if (!addForm.host.trim()) { self.setState({ addHostError: true }); return; }
+        self.setState({ addTest: { start: tick, host: addForm.host.trim(), port: addForm.port || '22', user: addForm.user || 'pi', name: addForm.name.trim() } });
+      },
+      resultText: connecting ? 'Checking the key, the agent version and the attached drive.' : addResult ? 'Added as ' + addResult.id + ' · pairing now; it appears in the fleet as Connecting until the agent reports its drive.' : '',
+      resultColor: addResult ? 'var(--phosphor)' : 'var(--ink-muted)'
+    };
+
     return {
-      yes: true, no: false,
+      yes: true, no: false, hundred: 100, forty: 40,
       theme: theme,
       screen: screen,
-      isDevices: screen === 'devices', isFiles: screen === 'files', isLog: screen === 'log', isSettings: screen === 'settings',
+      navActive: screen === 'device' ? 'devices' : screen,
+      isDevices: screen === 'devices', isDevice: screen === 'device', isFiles: screen === 'files', isGallery: screen === 'gallery', isLog: screen === 'log', isSettings: screen === 'settings',
       nav: [
         { label: 'Fleet', items: [
           { id: 'devices', label: 'Devices', icon: 'hard-drive', count: devices.length },
-          { id: 'files', label: 'Files', icon: 'folder', count: pending } ] },
+          { id: 'files', label: 'Files', icon: 'folder', count: pending },
+          { id: 'gallery', label: 'Gallery', icon: 'file', count: videos.length } ] },
         { label: 'Server', items: [
           { id: 'log', label: 'Log', icon: 'terminal' },
           { id: 'settings', label: 'Settings', icon: 'settings' } ] }
@@ -340,7 +1777,7 @@ class Component extends DCLogic {
         return {
           add: function () { var rows = copyRows(); rows[ri].push('server'); setRows(rows); },
           panes: row.map(function (id, pi) {
-            var d = devices.filter(function (x) { return x.id === id; })[0];
+            var d = byId[id];
             return { id: id,
               title: id === 'server' ? 'usbcloud-01 · server' : (id + ' · ' + (d ? d.name : '')),
               entries: id === 'server' ? log : (d ? self.deviceLog(d) : []),
@@ -351,11 +1788,12 @@ class Component extends DCLogic {
       }),
       crumbsDevices: ['USBCloud', 'Fleet'],
       crumbsFiles: ['USBCloud', 'Fleet'],
+      crumbsGallery: ['USBCloud', 'Fleet'],
       crumbsServer: ['USBCloud', 'Server'],
       deviceTabs: [
         { id: 'all', label: 'All', count: devices.length },
         { id: 'online', label: 'Online', count: online },
-        { id: 'syncing', label: 'Syncing', count: syncing },
+        { id: 'syncing', label: 'In flight', count: inProgress.length },
         { id: 'offline', label: 'Offline', count: offline },
         { id: 'fault', label: 'Faults', count: faults }
       ],
@@ -363,31 +1801,42 @@ class Component extends DCLogic {
       setTab: function (id) { self.setState({ tab: id }); },
       stats: {
         total: devices.length, totalLine: online + ' online · ' + offline + ' offline',
-        syncing: syncing, syncingLine: inFlight + ' files in flight',
+        syncing: inProgress.length, syncingLine: inFlightFiles + ' files in flight · ' + (flightRate ? self.fmtRate(flightRate) : 'paused'),
+        flightDone: flightDone, flightTotal: Math.max(1, flightTotal), flightLive: flightRate > 0,
+        flightDoneText: self.fmtB(flightDone), flightTotalText: 'of ' + self.fmtB(flightTotal),
         pending: pending, pendingLine: 'across ' + pendingDevices + ' devices',
         faults: faults, faultLine: faultDevice ? (faultDevice.id + ' · ' + faultDevice.fault) : '0 faults'
       },
-      caption: visible.length + ' of ' + devices.length + ' devices',
+      caption: visible.length + ' of ' + devices.length + ' devices' + (fdev.count ? ' · ' + fdev.count + (fdev.count === 1 ? ' filter' : ' filters') : ''),
       deviceColumns: deviceColumns,
       deviceRows: deviceRows,
       selected: selDev.id,
       selectRow: function (r) { self.setState({ selected: r.id }); },
       sel: sel,
-      logShort: 180,
-      logTall: 560,
+      fdev: fdev,
+      pull: pullVals,
       serverLog: log,
       fileTabs: [
-        { id: 'pending', label: 'Pending', count: pending },
-        { id: 'pulled', label: 'Pulled' },
-        { id: 'all', label: 'All' }
+        { id: 'pending', label: 'Pending', count: fileCounts.pending },
+        { id: 'inflight', label: 'In flight', count: fileCounts.inflight },
+        { id: 'pulled', label: 'Pulled', count: fileCounts.pulled },
+        { id: 'failed', label: 'Failed', count: fileCounts.failed },
+        { id: 'all', label: 'All', count: files.length }
       ],
       fileTab: fileTab,
       setFileTab: function (id) { self.setState({ fileTab: id }); },
+      ffiles: ffiles,
       fileCaption: fileCaption,
       fileColumns: fileColumns,
       fileRows: fileRows,
-      selectedFile: s.selectedFile || '/mnt/usb0/log/van12_20261106.csv',
-      selectFile: function (r) { self.setState({ selectedFile: r.path }); },
+      selectedFile: selectedPath,
+      selectFile: function (r) { self.setState({ selectedFile: r.path, player: { path: r.path, pos: 0, playing: false, start: tick, muted: s.player ? !!s.player.muted : false } }); },
+      file: fileVals,
+      player: player,
+      fgal: fgal,
+      gal: galVals,
+      dev: devVals,
+      add: addVals,
       conflictOptions: [
         { value: 'keep-newest', label: 'Keep newest', hint: 'default' },
         { value: 'keep-both', label: 'Keep both' },

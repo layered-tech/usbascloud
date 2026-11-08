@@ -76,6 +76,62 @@ class LiveReadTest(unittest.TestCase):
             lock.assert_not_called()
             self.assertTrue(json.loads(stream.getvalue())['gadget_loaded'])
 
+class SnapshotTimeoutTest(unittest.TestCase):
+    def test_validates_timeout_before_touching_storage(self):
+        with patch.object(blink_poc, 'attach_pool') as attach:
+            for seconds in (0, 59, 3601):
+                with self.assertRaisesRegex(ValueError, 'Snapshot timeout'):
+                    blink_poc.open_snapshot(seconds)
+            attach.assert_not_called()
+
+    def test_applies_requested_lease_duration(self):
+        import contextlib
+        import io
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            lease = root / 'snapshot.json'
+            with patch.object(blink_poc, 'BASE', root), patch.object(blink_poc, 'LEASE', lease), patch.object(blink_poc, 'SNAP', str(root / 'capture')), patch.object(blink_poc, 'EXPORT', root / 'export'), patch.object(blink_poc, 'attach_pool'), patch.object(blink_poc, 'release'), patch.object(blink_poc, 'run'), patch('subprocess.run', return_value=SimpleNamespace(stdout='exfat')), patch('time.time', return_value=100), contextlib.redirect_stdout(io.StringIO()):
+                blink_poc.open_snapshot(900)
+            self.assertEqual(json.loads(lease.read_text())['expires_at'], 1000)
+
+class RestrictedSshTest(unittest.TestCase):
+    def test_rejects_shell_commands_and_destructive_initialization(self):
+        for command in ('id', 'cat /etc/passwd', 'sudo -n blink-poc init', 'sudo -n blink-poc ssh-serve'):
+            with patch.dict('os.environ', {'SSH_ORIGINAL_COMMAND': command}), patch('os.execvp') as execute:
+                with self.assertRaisesRegex(RuntimeError, 'only permits USBCloud'):
+                    blink_poc.serve_ssh()
+                execute.assert_not_called()
+
+    def test_executes_only_the_validated_command_without_a_shell(self):
+        with patch.dict('os.environ', {'SSH_ORIGINAL_COMMAND': 'sudo -n blink-poc status'}), patch('os.execvp') as execute:
+            blink_poc.serve_ssh()
+        execute.assert_called_once_with('sudo', ['sudo', '-n', '/usr/local/sbin/blink-poc', 'status'])
+
+    def test_reads_only_normal_files_inside_a_live_snapshot(self):
+        import base64
+        import contextlib
+        import io
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            snapshot = root / 'export'
+            snapshot.mkdir()
+            (snapshot / 'clip.mp4').write_bytes(b'clip')
+            (root / 'private').write_bytes(b'private')
+            (snapshot / 'link').symlink_to(root / 'private')
+            lease = root / 'lease.json'
+            lease.write_text(json.dumps({'token': 'active', 'expires_at': time.time() + 60}))
+            class Output:
+                buffer = io.BytesIO()
+            out = Output()
+            with patch.object(blink_poc, 'EXPORT', snapshot), patch.object(blink_poc, 'LEASE', lease), patch('os.path.ismount', return_value=True), patch('sys.stdout', out):
+                blink_poc.snapshot_read('active', base64.urlsafe_b64encode(b'clip.mp4').decode())
+                self.assertEqual(out.buffer.getvalue(), b'clip')
+                for path in (b'../private', b'/etc/passwd', b'link', b'a/../../private'):
+                    with self.assertRaises((RuntimeError, ValueError, FileNotFoundError)):
+                        blink_poc.snapshot_read('active', base64.urlsafe_b64encode(path).decode())
+                with self.assertRaisesRegex(RuntimeError, 'token'):
+                    blink_poc.snapshot_read('wrong', base64.urlsafe_b64encode(b'clip.mp4').decode())
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\SaveUsbCloudDeviceRequest;
 use App\Http\Requests\UpdateUsbCloudSettingsRequest;
 use App\Services\UsbCloud;
+use App\Services\UsbCloudDevices;
+use App\Services\UsbCloudTransfers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -56,6 +60,75 @@ class UsbCloudController extends Controller
         }, 200, ['Content-Type' => 'application/x-ndjson', 'Cache-Control' => 'no-store', 'X-Accel-Buffering' => 'no']);
     }
 
+    public function discover(UsbCloudDevices $devices): JsonResponse
+    {
+        return response()->json($devices->discover());
+    }
+
+    public function addDevice(SaveUsbCloudDeviceRequest $request, UsbCloudDevices $devices, UsbCloud $cloud): JsonResponse
+    {
+        try {
+            $id = $devices->add($request->validated());
+            $cloud->log($id, 'ok', 'Device added to fleet.');
+
+            return response()->json(['device' => $id], 201);
+        } catch (RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+    }
+
+    public function updateDevice(SaveUsbCloudDeviceRequest $request, UsbCloudDevices $devices, string $device): JsonResponse
+    {
+        abort_unless(isset($devices->all()[$device]), 404);
+        $settings = $devices->save($device, $request->validated());
+        app(UsbCloud::class)->log($device, 'ok', 'Device settings saved.');
+
+        return response()->json(['settings' => array_diff_key($settings, array_flip(['directory', 'identity', 'host_key_alias', 'removed']))]);
+    }
+
+    public function testDevice(SaveUsbCloudDeviceRequest $request, UsbCloudDevices $devices, string $device): JsonResponse
+    {
+        $connection = $devices->all()[$device] ?? null;
+        abort_unless($connection !== null, 404);
+        try {
+            return response()->json($devices->test(array_replace($connection, $request->validated())));
+        } catch (RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+    }
+
+    public function removeDevice(UsbCloudDevices $devices, UsbCloudTransfers $transfers, string $device): JsonResponse
+    {
+        abort_unless(isset($devices->all()[$device]), 404);
+        abort_if($transfers->active($device) || Cache::has('usbcloud.operation.'.$device), 409, 'Stop the transfer before removing this device.');
+        $devices->save($device, ['removed' => true]);
+        app(UsbCloud::class)->log($device, 'warn', 'Device removed from fleet. Saved files retained.');
+
+        return response()->json(['message' => 'Device removed. Saved files are retained.']);
+    }
+
+    public function transfer(Request $request, UsbCloud $cloud, UsbCloudTransfers $transfers): JsonResponse
+    {
+        $data = $request->validate([
+            'device' => ['nullable', Rule::in(array_keys($cloud->connections()))],
+            'action' => ['required', Rule::in(['start', 'pause', 'resume', 'cancel'])],
+        ]);
+        $ids = empty($data['device']) ? array_keys($cloud->connections()) : [$data['device']];
+        $results = [];
+        foreach ($ids as $id) {
+            try {
+                if (empty($data['device']) && $data['action'] !== 'start' && ! ($data['action'] === 'resume' ? in_array($transfers->progress($id)['state'] ?? '', ['paused', 'failed', 'cancelled'], true) : ($transfers->active($id) || ($data['action'] === 'cancel' && ($transfers->progress($id)['state'] ?? '') === 'paused')))) {
+                    continue;
+                }
+                $results[$id] = ['success' => true, 'transfer' => $data['action'] === 'start' ? $transfers->queue($id) : $transfers->control($id, $data['action'])];
+            } catch (RuntimeException $exception) {
+                $results[$id] = ['success' => false, 'message' => $exception->getMessage()];
+            }
+        }
+
+        return response()->json(['results' => $results], collect($results)->contains(fn (array $result): bool => ! $result['success']) ? 409 : 202);
+    }
+
     public function settings(UpdateUsbCloudSettingsRequest $request, UsbCloud $cloud): JsonResponse
     {
         $cloud->saveSettings($request->validated());
@@ -70,9 +143,14 @@ class UsbCloudController extends Controller
         $path = $cloud->client($entry['device'])->filePath($entry['run'] ?? '', $entry);
         abort_unless($path !== null, 404);
         $name = basename($entry['name']);
-        $preview = $request->boolean('preview') && in_array(strtolower(pathinfo($name, PATHINFO_EXTENSION)), ['mp4', 'webm', 'mp3', 'wav', 'jpg', 'jpeg', 'png', 'gif'], true);
+        $preview = $request->boolean('preview') && in_array(strtolower(pathinfo($name, PATHINFO_EXTENSION)), ['mp4', 'webm', 'mov', 'm4v', 'mp3', 'wav', 'ogg', 'm4a', 'jpg', 'jpeg', 'png', 'gif', 'webp'], true);
         $response = $preview ? response()->file($path) : response()->download($path, $name);
 
+        if ($preview) {
+            $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+            $mime = ['mp4' => 'video/mp4', 'm4v' => 'video/mp4', 'webm' => 'video/webm', 'mov' => 'video/quicktime', 'mp3' => 'audio/mpeg', 'wav' => 'audio/wav', 'ogg' => 'audio/ogg', 'm4a' => 'audio/mp4', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp'][$extension];
+            $response->headers->set('Content-Type', $mime);
+        }
         $response->headers->set('Cache-Control', 'no-store, private');
         $response->headers->set('X-Content-Type-Options', 'nosniff');
 

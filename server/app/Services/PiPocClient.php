@@ -5,6 +5,7 @@ namespace App\Services;
 use Closure;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
@@ -13,7 +14,7 @@ class PiPocClient
 {
     private ?Closure $onOutput = null;
 
-    /** @param array<string, string> $connection */
+    /** @param array<string, mixed> $connection */
     public function __construct(private array $connection = []) {}
 
     /** @return array<string, mixed> */
@@ -52,7 +53,7 @@ class PiPocClient
     }
 
     /** @return array<string, mixed> */
-    public function retrieve(?Closure $onOutput = null, bool $copy = true): array
+    public function retrieve(?Closure $onOutput = null, bool $copy = true, ?Closure $onProgress = null, ?Closure $control = null): array
     {
         $this->onOutput = $onOutput;
         $this->consolidateLegacyFiles();
@@ -68,7 +69,10 @@ class PiPocClient
                 throw new RuntimeException((string) $before['error']);
             }
             $run['log'][] = 'Opening a read-only snapshot on the Pi.';
-            $lease = json_decode($this->ssh('sudo -n blink-poc snapshot-open'), true, flags: JSON_THROW_ON_ERROR);
+            $timeout = (int) ($this->connection['snapshot_timeout'] ?? 600);
+            $openCommand = 'sudo -n blink-poc snapshot-open'.(isset($this->connection['snapshot_timeout']) ? ' --timeout '.$timeout : '');
+            $onProgress?->__invoke(['stage' => 'Opening snapshot']);
+            $lease = json_decode($this->ssh($openCommand), true, flags: JSON_THROW_ON_ERROR);
             if (! is_string($lease['token'] ?? null) || ! preg_match('/\A[a-f0-9]{32}\z/', $lease['token'])) {
                 throw new RuntimeException('The Pi returned an invalid snapshot token. Its expiry timer will clean up the snapshot.');
             }
@@ -78,6 +82,7 @@ class PiPocClient
             }
             $run['log'][] = 'Requesting SHA-256 checksums from the Pi snapshot.';
             $started = microtime(true);
+            $onProgress?->__invoke(['stage' => 'Hashing files on Pi']);
             $manifest = json_decode($this->ssh('sudo -n blink-poc snapshot-manifest --token '.$token), true, flags: JSON_THROW_ON_ERROR);
             if (! is_array($manifest['files'] ?? null) || ! array_is_list($manifest['files'])) {
                 throw new RuntimeException('The Pi returned an invalid file manifest.');
@@ -94,7 +99,14 @@ class PiPocClient
             }
             $inventory = ['at' => now()->toIso8601String(), 'files' => $manifest['files'], 'filesystem' => $manifest['filesystem'] ?? null];
             File::replace($this->directory().'/inventory.json', json_encode($inventory, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
+            $newFiles = array_filter($manifest['files'], fn (array $entry): bool => ! (File::isFile($this->directory().'/objects/'.$entry['sha256']) && File::size($this->directory().'/objects/'.$entry['sha256']) === $entry['bytes'] && hash_file('sha256', $this->directory().'/objects/'.$entry['sha256']) === $entry['sha256']));
+            $totalBytes = array_sum(array_column($newFiles, 'bytes'));
+            $doneBytes = 0;
+            $onProgress?->__invoke(['stage' => 'Transferring', 'total_files' => count($newFiles), 'total_bytes' => $totalBytes, 'done_files' => 0, 'done_bytes' => 0, 'skipped' => count($manifest['files']) - count($newFiles)]);
             foreach ($manifest['files'] as $entry) {
+                if ($control && $control()) {
+                    throw new RuntimeException('Transfer interrupted.');
+                }
                 if (! $copy) {
                     continue;
                 }
@@ -106,16 +118,27 @@ class PiPocClient
 
                     continue;
                 }
-                if (microtime(true) - $started > 300) {
+                if (microtime(true) - $started > $timeout - 5) {
                     throw new RuntimeException('Transfer window exhausted. Retry to retrieve the remaining new files.');
                 }
                 $temporary = $directory.'/files/'.$digest.'.partial';
                 $this->onOutput?->__invoke('Transferring new file: '.$entry['name']."\n");
-                $this->execute(['scp', '-v', ...$this->options(), $this->target().':/srv/blink-poc/snapshot/'.$entry['name'], $temporary]);
+                $onProgress?->__invoke(['current_file' => $entry['name'], 'current_bytes' => 0, 'current_total' => $entry['bytes']]);
+                $limit = (float) ($this->connection['bandwidth'] ?? 0);
+                $streaming = ($this->connection['transfer_protocol'] ?? config('pi-poc.transfer_protocol')) === 'stream';
+                $command = ['scp', ...($limit > 0 ? ['-l', (string) max(1, (int) ($limit * 8000))] : []), ...$this->options(), $this->target().':/srv/blink-poc/snapshot/'.$entry['name'], $temporary];
+                if ($streaming) {
+                    $encoded = strtr(base64_encode($entry['name']), '+/', '-_');
+                    $command = ['ssh', ...$this->options(), $this->target(), 'sudo -n blink-poc snapshot-read --token '.$token.' --path '.$encoded];
+                }
+                $this->transferFile($command, $temporary, $entry['bytes'], $doneBytes, $totalBytes, $timeout, $onProgress, $control, $streaming, $limit);
+                clearstatcache(true, $temporary);
                 if (File::size($temporary) !== $entry['bytes'] || hash_file('sha256', $temporary) !== $digest) {
                     throw new RuntimeException('Downloaded file does not match the Pi checksum: '.$entry['name']);
                 }
                 File::move($temporary, $destination);
+                $doneBytes += $entry['bytes'];
+                $onProgress?->__invoke(['done_bytes' => $doneBytes, 'current_bytes' => 0, 'current_total' => 0, 'current_file' => null, 'done_files' => count($run['files']) + 1]);
                 $run['files'][] = [
                     'id' => count($run['files']), 'name' => $entry['name'],
                     'bytes' => $entry['bytes'], 'sha256' => $digest,
@@ -128,6 +151,9 @@ class PiPocClient
                 ? count($run['files']).' new files saved; '.$run['already_saved'].' already saved files skipped. SHA-256 hashes calculated on the Pi; downloaded files verified on this server.'
                 : count($manifest['files']).' files scanned. No file contents transferred.';
         } catch (Throwable $e) {
+            if ($control && $control()) {
+                $run['interrupted'] = $control();
+            }
             $run['error'] = $e->getMessage();
         } finally {
             File::deleteDirectory($directory.'/files');
@@ -146,6 +172,70 @@ class PiPocClient
         File::put($directory.'/result.json', json_encode($run, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
 
         return $run;
+    }
+
+    /** @param list<string> $command */
+    private function transferFile(array $command, string $temporary, int $size, int $done, int $total, int $timeout, ?Closure $progress, ?Closure $control, bool $streaming = false, float $limit = 0): void
+    {
+        $started = microtime(true);
+        $received = 0;
+        $stream = $streaming ? fopen($temporary, 'wb') : null;
+        if ($streaming && ! is_resource($stream)) {
+            throw new RuntimeException('Cannot create the downloaded file.');
+        }
+        $process = null;
+        try {
+            $process = Process::timeout($timeout)->start($command, function (string $type, string $data) use ($stream, $streaming, $limit, $started, $progress, $control, $done, $total, &$received): void {
+                if ($streaming && $type === 'out' && is_resource($stream)) {
+                    $length = strlen($data);
+                    $offset = 0;
+                    while ($offset < $length) {
+                        $written = fwrite($stream, substr($data, $offset));
+                        if ($written === false || $written === 0) {
+                            throw new RuntimeException('Cannot save the downloaded file.');
+                        }
+                        $offset += $written;
+                    }
+                    $received += $length;
+                    if ($limit > 0) {
+                        $delay = $received / ($limit * 1000000) - (microtime(true) - $started);
+                        while ($delay > 0) {
+                            if ($control && $control()) {
+                                throw new RuntimeException('Transfer interrupted.');
+                            }
+                            $rate = (int) ($received / max(0.1, microtime(true) - $started));
+                            $progress?->__invoke(['current_bytes' => $received, 'rate' => $rate, 'eta' => $rate > 0 ? (int) ceil(($total - $done - $received) / $rate) : null]);
+                            Sleep::for((int) min(200000, $delay * 1000000))->microseconds();
+                            $delay = $received / ($limit * 1000000) - (microtime(true) - $started);
+                        }
+                    }
+                }
+            });
+            while ($process->running()) {
+                if ($control && $control()) {
+                    $process->signal(15);
+                    $process->wait();
+                    throw new RuntimeException('Transfer interrupted.');
+                }
+                clearstatcache(true, $temporary);
+                $current = is_file($temporary) ? min($size, filesize($temporary)) : 0;
+                $rate = (int) ($current / max(0.1, microtime(true) - $started));
+                $progress?->__invoke(['current_bytes' => $current, 'rate' => $rate, 'eta' => $rate > 0 ? (int) ceil(($total - $done - $current) / $rate) : null]);
+                Sleep::for(20)->milliseconds();
+            }
+            $result = $process->wait();
+            if ($result->failed()) {
+                throw new RuntimeException(trim($result->errorOutput()) ?: 'File transfer failed.');
+            }
+        } finally {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+            if ($process !== null && $process->running()) {
+                $process->signal(15);
+                $process->wait();
+            }
+        }
     }
 
     /** @param array<string, mixed> $entry */
@@ -225,9 +315,10 @@ class PiPocClient
     /** @return array<int, string> */
     private function options(): array
     {
-        $agent = getenv('SSH_AUTH_SOCK') ? ['-o', 'IdentityAgent=SSH_AUTH_SOCK'] : [];
+        $identity = $this->connection['identity'] ?? (string) config('pi-poc.identity');
+        $agent = $identity === storage_path('app/private/usbcloud/ssh/id_ed25519') ? ['-o', 'IdentityAgent=none'] : (getenv('SSH_AUTH_SOCK') ? ['-o', 'IdentityAgent=SSH_AUTH_SOCK'] : []);
 
-        return [...$agent, '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', '-o', 'StrictHostKeyChecking=yes', '-o', 'IdentitiesOnly=yes', '-o', 'HostKeyAlias='.($this->connection['host_key_alias'] ?? config('pi-poc.host_key_alias')), '-i', $this->connection['identity'] ?? (string) config('pi-poc.identity')];
+        return [...$agent, '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', '-o', 'StrictHostKeyChecking=yes', '-o', 'IdentitiesOnly=yes', '-o', 'Port='.(int) ($this->connection['port'] ?? 22), '-o', 'HostKeyAlias='.($this->connection['host_key_alias'] ?? $this->connection['host'] ?? config('pi-poc.host_key_alias')), '-i', $this->connection['identity'] ?? (string) config('pi-poc.identity')];
     }
 
     private function target(): string

@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>USBCloud</Name>
+  <Repository>ghcr.io/layered-tech/usbascloud:latest</Repository>
+  <Registry>https://ghcr.io/layered-tech/usbascloud</Registry>
+  <Network>bridge</Network>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Project>https://github.com/layered-tech/usbascloud</Project>
+  <Support>https://github.com/layered-tech/usbascloud/issues</Support>
+  <TemplateURL>https://raw.githubusercontent.com/layered-tech/usbascloud/main/unraid/templates/usbcloud.xml</TemplateURL>
+  <Overview>Manage USBCloud storage clients, archive recordings, and monitor device health. Includes the web dashboard, scheduler and transfer worker. Set Backend URL to the NAS address and mapped web port that your clients can reach. The management dashboard currently assumes a trusted local network.</Overview>
+  <Category>Backup: Tools:Utilities</Category>
+  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+  <Beta>true</Beta>
+  <Config Name="Web port" Target="8080" Default="8088" Mode="tcp" Description="Web dashboard and device heartbeat API." Type="Port" Display="always" Required="true" Mask="false"/>
+  <Config Name="App settings" Target="/data" Default="/mnt/user/appdata/usbcloud/config" Mode="rw" Description="Persistent settings, encryption key and SSH identity. Back up this directory." Type="Path" Display="always" Required="true" Mask="false"/>
+  <Config Name="Database" Target="/database" Default="/mnt/user/appdata/usbcloud/database" Mode="rw" Description="SQLite database and its journal files. Keep this directory across container updates." Type="Path" Display="always" Required="true" Mask="false"/>
+  <Config Name="Media clips" Target="/archive" Default="/mnt/user/usbcloud" Mode="rw" Description="Persistent recordings, separate from application settings." Type="Path" Display="always" Required="true" Mask="false"/>
+  <Config Name="Backend URL" Target="APP_URL" Default="" Description="Required: full URL reachable from every client, for example http://192.168.1.10:8088. Use your HTTPS reverse proxy URL when available." Type="Variable" Display="always" Required="true" Mask="false"/>
+  <Config Name="Timezone" Target="TZ" Default="America/Chicago" Description="Container timezone." Type="Variable" Display="always" Required="true" Mask="false"/>
+  <Config Name="PUID" Target="PUID" Default="99" Description="File owner user ID." Type="Variable" Display="advanced" Required="true" Mask="false"/>
+  <Config Name="PGID" Target="PGID" Default="100" Description="File owner group ID." Type="Variable" Display="advanced" Required="true" Mask="false"/>
+</Container>

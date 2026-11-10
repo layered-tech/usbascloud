@@ -55,5 +55,3 @@ yarn-error.log
 # Python client caches
 __pycache__/
 *.py[cod]
-
-.github

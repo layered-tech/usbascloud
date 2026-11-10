@@ -1,11 +1,11 @@
 import inertia from '@inertiajs/vite';
-import { wayfinder } from '@laravel/vite-plugin-wayfinder';
+import {wayfinder} from '@laravel/vite-plugin-wayfinder';
 import babel from '@rolldown/plugin-babel';
 import tailwindcss from '@tailwindcss/vite';
-import react, { reactCompilerPreset } from '@vitejs/plugin-react';
+import react, {reactCompilerPreset} from '@vitejs/plugin-react';
 import laravel from 'laravel-vite-plugin';
-import { bunny } from 'laravel-vite-plugin/fonts';
-import { defineConfig, lazyPlugins } from 'vite-plus';
+import {bunny} from 'laravel-vite-plugin/fonts';
+import {defineConfig, lazyPlugins} from 'vite-plus';
 
 export default defineConfig({
     plugins: lazyPlugins(() => [
@@ -41,6 +41,10 @@ export default defineConfig({
     },
     lint: {
         ignorePatterns: [
+            '.ai/**',
+            'design/**',
+            'outputs/**',
+            'work/**',
             'vendor/**',
             'node_modules/**',
             'public/**',
@@ -64,6 +68,10 @@ export default defineConfig({
         singleAttributePerLine: false,
         htmlWhitespaceSensitivity: 'css',
         ignorePatterns: [
+            '.ai/**',
+            'design/**',
+            'outputs/**',
+            'work/**',
             '.github/**',
             'composer.json',
             'resources/js/components/ui/*',

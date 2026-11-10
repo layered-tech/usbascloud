@@ -1,18 +1,8 @@
-import { Head, router } from '@inertiajs/react';
-import {
-    ArrowDownToLine,
-    CheckCircle2,
-    HardDrive,
-    RefreshCw,
-    Usb,
-} from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import {
-    file as clipFile,
-    retrieve,
-    refresh as refreshStatus,
-} from '@/actions/App/Http/Controllers/ClientConsoleController';
-import { Button } from '@/components/ui/button';
+import {Head, router} from '@inertiajs/react';
+import {ArrowDownToLine, CheckCircle2, HardDrive, RefreshCw, Usb,} from 'lucide-react';
+import {useEffect, useRef, useState} from 'react';
+import {file as clipFile, refresh as refreshStatus, retrieve,} from '@/actions/App/Http/Controllers/ClientConsoleController';
+import {Button} from '@/components/ui/button';
 
 type PiStatus = {
     online: boolean;
@@ -47,7 +37,11 @@ const bytes = (value: number) =>
         value / 1024 / 1024,
     ) + ' MB';
 
-export default function ClientConsole({ host, status: initialStatus, runs }: Props) {
+export default function ClientConsole({
+    host,
+    status: initialStatus,
+    runs,
+}: Props) {
     const [status, setStatus] = useState(initialStatus);
     const [processing, setProcessing] = useState(false);
     const [output, setOutput] = useState('');

@@ -2988,18 +2988,95 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                                         ],
                                                     ]}
                                                 />
-                                                <h2 className="uc-label uc-muted">Device health</h2>
-                                                <Details items={[
-                                                    ['Status source', active.status_source === 'heartbeat' ? 'API heartbeat · every 30 s' : 'SSH · client upgrade needed'],
-                                                    ['Last report', active.checked_at ? date(active.checked_at) : 'Waiting for first heartbeat'],
-                                                    ['Health', active.status === 'offline' ? 'Offline · metrics may be stale' : active.health_warnings.length ? active.health_warnings.join(' · ') : active.metrics ? 'Healthy' : 'Awaiting metrics'],
-                                                    ['CPU temperature', active.metrics?.cpu_temperature_c != null ? `${active.metrics.cpu_temperature_c.toFixed(1)} °C` : '—'],
-                                                    ['CPU load (1 min)', active.metrics?.load_1m != null ? `${active.metrics.load_1m.toFixed(2)} / ${active.metrics.cpu_count ?? '?'} cores` : '—'],
-                                                    ['Memory used', active.metrics?.memory_used_percent != null ? `${active.metrics.memory_used_percent}%` : '—'],
-                                                    ['System disk used', active.metrics?.root_used_percent != null ? `${active.metrics.root_used_percent}%` : '—'],
-                                                    ['System disk free', active.metrics?.root_free_bytes != null ? bytes(active.metrics.root_free_bytes) : '—'],
-                                                    ['Power / thermal flags', active.metrics?.throttled_flags != null ? `0x${active.metrics.throttled_flags.toString(16)}` : '—'],
-                                                ]} />
+                                                <h2 className="uc-label uc-muted">
+                                                    Device health
+                                                </h2>
+                                                <Details
+                                                    items={[
+                                                        [
+                                                            'Status source',
+                                                            active.status_source ===
+                                                            'heartbeat'
+                                                                ? 'API heartbeat · every 30 s'
+                                                                : 'SSH · client upgrade needed',
+                                                        ],
+                                                        [
+                                                            'Last report',
+                                                            active.checked_at
+                                                                ? date(
+                                                                      active.checked_at,
+                                                                  )
+                                                                : 'Waiting for first heartbeat',
+                                                        ],
+                                                        [
+                                                            'Health',
+                                                            active.status ===
+                                                            'offline'
+                                                                ? 'Offline · metrics may be stale'
+                                                                : active
+                                                                        .health_warnings
+                                                                        .length
+                                                                  ? active.health_warnings.join(
+                                                                        ' · ',
+                                                                    )
+                                                                  : active.metrics
+                                                                    ? 'Healthy'
+                                                                    : 'Awaiting metrics',
+                                                        ],
+                                                        [
+                                                            'CPU temperature',
+                                                            active.metrics
+                                                                ?.cpu_temperature_c !=
+                                                            null
+                                                                ? `${active.metrics.cpu_temperature_c.toFixed(1)} °C`
+                                                                : '—',
+                                                        ],
+                                                        [
+                                                            'CPU load (1 min)',
+                                                            active.metrics
+                                                                ?.load_1m !=
+                                                            null
+                                                                ? `${active.metrics.load_1m.toFixed(2)} / ${active.metrics.cpu_count ?? '?'} cores`
+                                                                : '—',
+                                                        ],
+                                                        [
+                                                            'Memory used',
+                                                            active.metrics
+                                                                ?.memory_used_percent !=
+                                                            null
+                                                                ? `${active.metrics.memory_used_percent}%`
+                                                                : '—',
+                                                        ],
+                                                        [
+                                                            'System disk used',
+                                                            active.metrics
+                                                                ?.root_used_percent !=
+                                                            null
+                                                                ? `${active.metrics.root_used_percent}%`
+                                                                : '—',
+                                                        ],
+                                                        [
+                                                            'System disk free',
+                                                            active.metrics
+                                                                ?.root_free_bytes !=
+                                                            null
+                                                                ? bytes(
+                                                                      active
+                                                                          .metrics
+                                                                          .root_free_bytes,
+                                                                  )
+                                                                : '—',
+                                                        ],
+                                                        [
+                                                            'Power / thermal flags',
+                                                            active.metrics
+                                                                ?.throttled_flags !=
+                                                            null
+                                                                ? `0x${active.metrics.throttled_flags.toString(16)}`
+                                                                : '—',
+                                                        ],
+                                                    ]}
+                                                />
                                                 <div className="uc-card-actions">
                                                     <Button
                                                         small

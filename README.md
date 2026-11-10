@@ -25,7 +25,14 @@ composer setup
 composer dev
 ```
 
-The Pi client has its own [installation and protocol notes](client/README.md).
+## First device setup
+
+Follow the [fresh Pi installation guide](client/README.md) to reimage the SD card
+with Raspberry Pi OS Lite, configure primary Wi-Fi and SSH, enable USB device
+mode, install USBCloud Client, initialize its USB storage, and register it through
+the NAS dashboard. Reimaging erases the Pi's OS and local recordings; NAS archives
+are separate. The guide includes the exact Pi and unRAID-terminal commands and
+checks for SSH trust, heartbeat health and the first media pull.
 
 ## Container deployment
 
@@ -52,9 +59,9 @@ access. Heartbeats use `APP_URL` unless `USBCLOUD_HEARTBEAT_URL` overrides it.
 
 The container starts with an empty fleet. Add clients through the dashboard;
 SSH key authorization and trusted device host keys must be configured first.
-The backend public key appears in Settings. For host-key enrollment, use the
-container console as `www-data` with `HOME=/data/app/private/usbcloud`, connect to
-the client with `ssh`, and verify its host-key fingerprint before accepting it.
+The backend public key appears in **Add device → Server public key for client
+setup**. Follow the [first-device guide](client/README.md#6-enroll-the-pis-host-key-on-the-nas)
+to enroll the verified Pi host key in persistent storage as `www-data`.
 All client credentials and host keys then survive container updates.
 
 ## unRAID Community Apps

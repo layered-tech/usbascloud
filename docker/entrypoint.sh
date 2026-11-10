@@ -7,7 +7,7 @@ if [ "$PUID" = 0 ] || [ "$PGID" = 0 ]; then
     exit 1
 fi
 groupmod -o -g "$PGID" www-data
-usermod -o -u "$PUID" -g "$PGID" www-data
+usermod -o -u "$PUID" -g "$PGID" -d /data/app/private/usbcloud www-data
 mkdir -p /database /data/framework/cache/data /data/framework/sessions /data/framework/views /data/logs /data/app/private/usbcloud/ssh /archive
 # Change only application directories; never recursively scan the clip archive.
 chown -R www-data:www-data /data/framework /data/logs /app/bootstrap/cache

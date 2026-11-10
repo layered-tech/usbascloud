@@ -3,6 +3,7 @@ import {Check, ChevronDown, ChevronRight, CloudDownload, Download, Film, Folder,
 import type {ButtonHTMLAttributes, ReactNode, Ref} from 'react';
 import {useEffect, useRef, useState} from 'react';
 import {addDevice, discover, download, file as downloadFile, operate, removeDevice, settings as saveSettings, testDevice, transfer, updateDevice,} from '@/actions/App/Http/Controllers/UsbCloudController';
+import {store as createInstallation} from '@/actions/App/Http/Controllers/ClientInstallationController';
 import {Dialog, DialogContent, DialogDescription, DialogTitle,} from '@/components/ui/dialog';
 import {MultiSelect, MultiSelectTheme} from '@/components/multi-select';
 import '../../css/usbcloud.css';
@@ -1082,6 +1083,16 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
         name: '',
     });
     const [addError, setAddError] = useState('');
+    const [existingClient, setExistingClient] = useState(false);
+    const [installation, setInstallation] = useState<{
+        command: string;
+        expires_at: string;
+    } | null>(null);
+    const [copyMessage, setCopyMessage] = useState('');
+    useEffect(() => {
+        setInstallation(null);
+        setCopyMessage('');
+    }, [addForm, existingClient, addOpen]);
     const [dismissed, setDismissed] = useState('');
     const [logRows, setLogRows] = useState<LogRowState[]>([
         { id: 'row-0', panes: [{ id: 'pane-0', source: 'server' }] },
@@ -2314,7 +2325,7 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                         onClick={() => {
                                             setAddOpen(true);
                                             setAddError('');
-                                            void scan();
+                                            if (existingClient) void scan();
                                         }}
                                     >
                                         <Plus size={16} />
@@ -3825,88 +3836,106 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                             Add a device
                         </DialogTitle>
                         <DialogDescription className="uc-data">
-                            Discover USBCloud clients on the local network or
-                            connect by address.
+                            Install a new Pi with one command, or connect an
+                            existing client.
                         </DialogDescription>
-                        <section className="uc-stack">
-                            <div className="uc-between">
-                                <h2 className="uc-label uc-muted">
-                                    Discovered on this network
-                                </h2>
-                                <Button
-                                    small
-                                    disabled={scanBusy}
-                                    onClick={() => void scan()}
-                                >
-                                    <RefreshCw
-                                        size={14}
-                                        className={
-                                            scanBusy ? 'uc-spinning' : ''
-                                        }
-                                    />
-                                    {scanBusy ? 'Scanning…' : 'Rescan'}
-                                </Button>
-                            </div>
-                            <p className="uc-data uc-muted" role="status">
-                                {scanMessage}
-                            </p>
-                            <div className="uc-discovery-list">
-                                {found.map((f) => (
-                                    <div
-                                        className="uc-discovery-result"
-                                        key={`${f.host}:${f.port}`}
+                        {existingClient && (
+                            <section className="uc-stack">
+                                <div className="uc-between">
+                                    <h2 className="uc-label uc-muted">
+                                        Discovered on this network
+                                    </h2>
+                                    <Button
+                                        small
+                                        disabled={scanBusy}
+                                        onClick={() => void scan()}
                                     >
-                                        <div>
-                                            <strong className="uc-data">
-                                                {f.name ?? f.host}
-                                            </strong>
-                                            <div className="uc-data uc-muted">
-                                                {f.host}:{f.port}
+                                        <RefreshCw
+                                            size={14}
+                                            className={
+                                                scanBusy ? 'uc-spinning' : ''
+                                            }
+                                        />
+                                        {scanBusy ? 'Scanning…' : 'Rescan'}
+                                    </Button>
+                                </div>
+                                <p className="uc-data uc-muted" role="status">
+                                    {scanMessage}
+                                </p>
+                                <div className="uc-discovery-list">
+                                    {found.map((f) => (
+                                        <div
+                                            className="uc-discovery-result"
+                                            key={`${f.host}:${f.port}`}
+                                        >
+                                            <div>
+                                                <strong className="uc-data">
+                                                    {f.name ?? f.host}
+                                                </strong>
+                                                <div className="uc-data uc-muted">
+                                                    {f.host}:{f.port}
+                                                </div>
                                             </div>
+                                            {f.id ? (
+                                                <Button
+                                                    small
+                                                    onClick={() => {
+                                                        setAddOpen(false);
+                                                        openDevice(f.id!);
+                                                    }}
+                                                >
+                                                    Open {f.id}
+                                                </Button>
+                                            ) : (
+                                                <Button
+                                                    small
+                                                    onClick={() =>
+                                                        setAddForm((old) => ({
+                                                            ...old,
+                                                            host: f.host,
+                                                            port: f.port,
+                                                        }))
+                                                    }
+                                                >
+                                                    Use address
+                                                </Button>
+                                            )}
                                         </div>
-                                        {f.id ? (
-                                            <Button
-                                                small
-                                                onClick={() => {
-                                                    setAddOpen(false);
-                                                    openDevice(f.id!);
-                                                }}
-                                            >
-                                                Open {f.id}
-                                            </Button>
-                                        ) : (
-                                            <Button
-                                                small
-                                                onClick={() =>
-                                                    setAddForm((old) => ({
-                                                        ...old,
-                                                        host: f.host,
-                                                        port: f.port,
-                                                    }))
-                                                }
-                                            >
-                                                Use address
-                                            </Button>
-                                        )}
-                                    </div>
-                                ))}
-                                {!found.length && !scanBusy && (
-                                    <p className="uc-data uc-muted">
-                                        No clients found. Enter a hostname or IP
-                                        below.
-                                    </p>
-                                )}
-                            </div>
-                        </section>
+                                    ))}
+                                    {!found.length && !scanBusy && (
+                                        <p className="uc-data uc-muted">
+                                            No clients found. Enter a hostname
+                                            or IP below.
+                                        </p>
+                                    )}
+                                </div>
+                            </section>
+                        )}
                         <form
                             className="uc-stack"
                             onSubmit={async (e) => {
                                 e.preventDefault();
                                 setAddError('');
                                 await perform(
-                                    'Connecting to device…',
+                                    existingClient
+                                        ? 'Connecting to device…'
+                                        : 'Preparing installer…',
                                     async () => {
                                         try {
+                                            if (!existingClient) {
+                                                setInstallation(
+                                                    await json<{
+                                                        command: string;
+                                                        expires_at: string;
+                                                    }>(
+                                                        createInstallation.url(),
+                                                        'POST',
+                                                        addForm,
+                                                    ),
+                                                );
+                                                setCopyMessage('');
+                                                return;
+                                            }
                                             const result = await json<{
                                                 device: string;
                                             }>(
@@ -3935,8 +3964,28 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                             }}
                         >
                             <h2 className="uc-label uc-muted">
-                                Add by address
+                                {existingClient
+                                    ? 'Connect by address'
+                                    : 'Install new client'}
                             </h2>
+                            <label className="uc-data">
+                                <input
+                                    type="checkbox"
+                                    checked={existingClient}
+                                    onChange={(event) => {
+                                        setExistingClient(event.target.checked);
+                                        if (!event.target.checked) {
+                                            setAddForm((old) => ({
+                                                ...old,
+                                                port: 22,
+                                            }));
+                                        }
+                                        setAddError('');
+                                        if (event.target.checked) void scan();
+                                    }}
+                                />{' '}
+                                Client is already installed
+                            </label>
                             <div className="uc-two-fields">
                                 <Field label="Hostname or IP">
                                     <div className="uc-field">
@@ -3975,6 +4024,7 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                             max={65535}
                                             required
                                             value={addForm.port}
+                                            disabled={!existingClient}
                                             onChange={(e) =>
                                                 setAddForm((old) => ({
                                                     ...old,
@@ -4002,47 +4052,51 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                 </Field>
                             </div>
                             <p className="uc-input-hint">
-                                The Pi needs the USBCloud client, the server’s
-                                SSH key in authorized_keys, and a trusted SSH
-                                host key on this server.
+                                {existingClient
+                                    ? 'Use this for a configured client with SSH access and a trusted host key already on the server.'
+                                    : 'Enter the Pi’s address and the username chosen in Raspberry Pi Imager. Use SSH port 22. The installer configures USB storage, SSH access, and health reporting. Keep the USB data cable disconnected until setup finishes.'}
                             </p>
-                            {cloud.server.ssh_public_key && (
-                                <details className="uc-data uc-break">
-                                    <summary>
-                                        Server public key for client setup
-                                    </summary>
-                                    <p>
-                                        Install the client with
-                                        USBCLOUD_PUBLIC_KEY_FILE pointing to a
-                                        file containing this public key. The
-                                        installer restricts it to USBCloud
-                                        commands.
+                            {installation && (
+                                <section
+                                    className="uc-stack"
+                                    aria-label="Installation command"
+                                >
+                                    <p className="uc-data">
+                                        Run this command in the Pi’s terminal,
+                                        then follow its reboot instructions.
                                     </p>
-                                    <code>{cloud.server.ssh_public_key}</code>
+                                    <code className="uc-data uc-break">
+                                        {installation.command}
+                                    </code>
+                                    <p className="uc-input-hint">
+                                        Private setup command · expires{' '}
+                                        {date(installation.expires_at)}. It
+                                        registers one Pi; rerunning it preserves
+                                        recordings.
+                                    </p>
                                     <Button
-                                        small
-                                        variant="ghost"
                                         onClick={() =>
                                             void navigator.clipboard
-                                                .writeText(
-                                                    cloud.server
-                                                        .ssh_public_key!,
-                                                )
+                                                .writeText(installation.command)
                                                 .then(() =>
-                                                    setScanMessage(
-                                                        'Public key copied.',
+                                                    setCopyMessage(
+                                                        'Installation command copied.',
                                                     ),
                                                 )
                                                 .catch(() =>
-                                                    setScanMessage(
-                                                        'Select and copy the public key above.',
+                                                    setCopyMessage(
+                                                        'Select and copy the command above.',
                                                     ),
                                                 )
                                         }
                                     >
-                                        Copy public key
+                                        Copy installation command
                                     </Button>
-                                </details>
+                                    <p className="uc-data" role="status">
+                                        {copyMessage ||
+                                            'The device appears in your fleet when the installer registers it.'}
+                                    </p>
+                                </section>
                             )}
 
                             {addError && (
@@ -4063,7 +4117,13 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                     disabled={!!working}
                                 >
                                     <PlugZap size={16} />
-                                    {working ? 'Connecting…' : 'Connect & add'}
+                                    {working
+                                        ? 'Preparing…'
+                                        : existingClient
+                                          ? 'Connect & add'
+                                          : installation
+                                            ? 'Generate another command'
+                                            : 'Generate installation command'}
                                 </Button>
                             </div>
                         </form>

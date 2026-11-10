@@ -83,7 +83,7 @@ class UsbCloudController extends Controller
         $settings = $devices->save($device, $request->validated());
         app(UsbCloud::class)->log($device, 'ok', 'Device settings saved.');
 
-        return response()->json(['settings' => array_diff_key($settings, array_flip(['directory', 'identity', 'host_key_alias', 'removed', 'heartbeat_token_hash']))]);
+        return response()->json(['settings' => array_diff_key($settings, array_flip(['directory', 'identity', 'host_key_alias', 'known_hosts_file', 'removed', 'heartbeat_token_hash']))]);
     }
 
     public function testDevice(SaveUsbCloudDeviceRequest $request, UsbCloudDevices $devices, string $device): JsonResponse

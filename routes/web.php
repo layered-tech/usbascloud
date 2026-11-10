@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ClientConsoleController;
+use App\Http\Controllers\ClientInstallationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Teams\TeamInvitationController;
 use App\Http\Controllers\UsbCloudController;
@@ -8,6 +9,7 @@ use App\Http\Middleware\EnsureTeamMembership;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [UsbCloudController::class, 'index'])->name('home');
+Route::post('/usbcloud/installations', [ClientInstallationController::class, 'store'])->middleware('throttle:20,1')->name('usbcloud.installations.store');
 Route::post('/usbcloud/operate', [UsbCloudController::class, 'operate'])->name('usbcloud.operate');
 Route::get('/usbcloud/discover', [UsbCloudController::class, 'discover'])->name('usbcloud.discover');
 Route::post('/usbcloud/devices', [UsbCloudController::class, 'addDevice'])->name('usbcloud.devices.add');

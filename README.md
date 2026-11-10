@@ -27,12 +27,11 @@ composer dev
 
 ## First device setup
 
-Follow the [fresh Pi installation guide](client/README.md) to reimage the SD card
-with Raspberry Pi OS Lite, configure primary Wi-Fi and SSH, enable USB device
-mode, install USBCloud Client, initialize its USB storage, and register it through
-the NAS dashboard. Reimaging erases the Pi's OS and local recordings; NAS archives
-are separate. The guide includes the exact Pi and unRAID-terminal commands and
-checks for SSH trust, heartbeat health and the first media pull.
+Follow the [client installation guide](client/README.md): image the Pi with
+Raspberry Pi OS Lite and Wi-Fi/SSH enabled, then generate an installation command
+in **Add device** and run it on the Pi. The installer configures USB mode, storage,
+SSH permissions, host-key trust, and health reporting, and offers the required
+reboot. Reimaging erases the Pi's OS and local recordings; NAS archives are separate.
 
 ## Container deployment
 
@@ -57,12 +56,10 @@ volumes, and stop the container before copying the SQLite database. The dashboar
 local network; use access controls and HTTPS at your reverse proxy for remote
 access. Heartbeats use `APP_URL` unless `USBCLOUD_HEARTBEAT_URL` overrides it.
 
-The container starts with an empty fleet. Add clients through the dashboard;
-SSH key authorization and trusted device host keys must be configured first.
-The backend public key appears in **Add device → Server public key for client
-setup**. Follow the [first-device guide](client/README.md#6-enroll-the-pis-host-key-on-the-nas)
-to enroll the verified Pi host key in persistent storage as `www-data`.
-All client credentials and host keys then survive container updates.
+The container starts with an empty fleet. Use **Add device → Generate installation
+command** to set up a new Pi. No unRAID terminal commands or manual host-key
+fingerprint enrollment are needed. Client credentials and pinned host keys persist
+across container updates. See the [client guide](client/README.md).
 
 ## unRAID Community Apps
 

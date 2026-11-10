@@ -328,6 +328,9 @@ class UsbCloudClient
     {
         $identity = $this->connection['identity'] ?? (string) config('usbcloud-client.identity');
         $agent = $identity === storage_path('app/private/usbcloud/ssh/id_ed25519') ? ['-o', 'IdentityAgent=none'] : (getenv('SSH_AUTH_SOCK') ? ['-o', 'IdentityAgent=SSH_AUTH_SOCK'] : []);
+        if (isset($this->connection['known_hosts_file'])) {
+            $agent = [...$agent, '-o', 'UserKnownHostsFile='.$this->connection['known_hosts_file'], '-o', 'GlobalKnownHostsFile=/dev/null'];
+        }
 
         return [...$agent, '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', '-o', 'StrictHostKeyChecking=yes', '-o', 'IdentitiesOnly=yes', '-o', 'Port='.(int) ($this->connection['port'] ?? 22), '-o', 'HostKeyAlias='.($this->connection['host_key_alias'] ?? $this->connection['host'] ?? config('usbcloud-client.host_key_alias')), '-i', $this->connection['identity'] ?? (string) config('usbcloud-client.identity')];
     }

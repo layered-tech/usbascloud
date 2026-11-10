@@ -84,7 +84,7 @@ class UsbCloud
             $devices[] = [
                 'id' => $id, 'name' => $connection['name'] ?? $id, 'address' => $connection['host'] ?? config('usbcloud-client.host'),
                 'status' => ! $status['online'] ? 'offline' : (($operation === 'pull' || $transferring || ($transfer['state'] ?? '') === 'paused') ? 'syncing' : (($fault || $healthWarnings) ? 'fault' : 'online')),
-                'operation' => $operation, 'transfer' => $transfer, 'config' => array_diff_key($connection, array_flip(['identity', 'host_key_alias', 'directory', 'removed', 'heartbeat_token_hash'])),
+                'operation' => $operation, 'transfer' => $transfer, 'config' => array_diff_key($connection, array_flip(['identity', 'host_key_alias', 'known_hosts_file', 'directory', 'removed', 'heartbeat_token_hash'])),
                 'hostname' => $state['hostname'] ?? null, 'model' => $state['model'] ?? null, 'snapshot' => isset($state['snapshot']) ? array_diff_key($state['snapshot'], ['token' => true]) : null, 'error' => $status['error'] ?? $fault ?? ($healthWarnings ? implode('; ', $healthWarnings) : null),
                 'gadget_loaded' => $state['gadget_loaded'] ?? null,
                 'usb_state' => implode(', ', $state['usb_state'] ?? []),

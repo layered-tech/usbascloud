@@ -4,7 +4,7 @@ import type {ButtonHTMLAttributes, ReactNode, Ref} from 'react';
 import {useEffect, useRef, useState} from 'react';
 import {addDevice, discover, download, file as downloadFile, operate, removeDevice, settings as saveSettings, testDevice, transfer, updateDevice,} from '@/actions/App/Http/Controllers/UsbCloudController';
 import {store as createInstallation} from '@/actions/App/Http/Controllers/ClientInstallationController';
-import {Dialog, DialogContent, DialogDescription, DialogTitle,} from '@/components/ui/dialog';
+import {Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger,} from '@/components/ui/dialog';
 import {MultiSelect, MultiSelectTheme} from '@/components/multi-select';
 import '../../css/usbcloud.css';
 
@@ -159,6 +159,38 @@ function Badge({ status }: { status: Status }) {
             <span className="uc-badge-dot" />
             {status === 'fault' ? 'Fault' : status}
         </span>
+    );
+}
+function ErrorSummary({ message, theme }: { message: string; theme: Theme }) {
+    return (
+        <div className="uc-error">
+            <p className="uc-error-summary">{message}</p>
+            <Dialog>
+                <DialogTrigger asChild>
+                    <Button small variant="ghost">
+                        View error details
+                    </Button>
+                </DialogTrigger>
+                <DialogContent
+                    className="usbcloud uc-error-dialog"
+                    data-theme={theme}
+                >
+                    <DialogTitle className="uc-heading">
+                        Error details
+                    </DialogTitle>
+                    <DialogDescription className="uc-data uc-muted">
+                        Full error message from the latest failed operation.
+                    </DialogDescription>
+                    <pre
+                        className="uc-data uc-error-details"
+                        tabIndex={0}
+                        aria-label="Full error message"
+                    >
+                        {message}
+                    </pre>
+                </DialogContent>
+            </Dialog>
+        </div>
     );
 }
 function Tabs({
@@ -515,10 +547,12 @@ function TransferPanel({
     device,
     onControl,
     disabled,
+    theme,
 }: {
     device: Device;
     onControl: (action: TransferAction, id?: string) => void;
     disabled: boolean;
+    theme: Theme;
 }) {
     const t = device.transfer;
     if (!t || ['completed', 'cancelled'].includes(t.state)) return null;
@@ -563,9 +597,9 @@ function TransferPanel({
                 ]}
             />
             {t.error && !['paused', 'cancelled'].includes(t.state) && (
-                <p className="uc-data" role="alert">
-                    {t.error}
-                </p>
+                <div className="uc-data" role="alert">
+                    <ErrorSummary message={t.error} theme={theme} />
+                </div>
             )}
             <div className="uc-card-actions">
                 {['running', 'queued'].includes(t.state) && (
@@ -1105,6 +1139,7 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
     const theme = settings.data.theme;
     const active =
         cloud.devices.find((d) => d.id === selected) ?? cloud.devices[0];
+    const faultMessage = cloud.devices.find((d) => d.status === 'fault')?.error;
     const logDeviceKey = [
         ...new Set(
             screen === 'log'
@@ -2600,7 +2635,14 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                         ) : (
                             <>
                                 {error ? <X size={16} /> : <Check size={16} />}
-                                <span className="uc-break">{message}</span>
+                                {error ? (
+                                    <ErrorSummary
+                                        message={message}
+                                        theme={theme}
+                                    />
+                                ) : (
+                                    <span className="uc-break">{message}</span>
+                                )}
                                 <Button
                                     small
                                     variant="ghost"
@@ -2641,10 +2683,14 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                         value: cloud.devices.filter(
                                             (d) => d.status === 'fault',
                                         ).length,
-                                        text:
-                                            cloud.devices.find(
-                                                (d) => d.status === 'fault',
-                                            )?.error ?? '0 faults',
+                                        text: faultMessage ? (
+                                            <ErrorSummary
+                                                message={faultMessage}
+                                                theme={theme}
+                                            />
+                                        ) : (
+                                            '0 faults'
+                                        ),
                                     },
                                 ].map((stat, i) => (
                                     <section
@@ -2823,6 +2869,7 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                         {active.transfer && (
                                             <TransferPanel
                                                 device={active}
+                                                theme={theme}
                                                 onControl={(a, id) =>
                                                     void control(a, id)
                                                 }
@@ -2910,6 +2957,7 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                             ) ? (
                                                 <TransferPanel
                                                     device={active}
+                                                    theme={theme}
                                                     onControl={(a, id) =>
                                                         void control(a, id)
                                                     }

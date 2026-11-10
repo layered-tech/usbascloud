@@ -262,8 +262,10 @@ def open_snapshot(timeout=600):
     write_json(LEASE, lease)
     try:
         device = SNAP
+        table_type = subprocess.run(['blkid', '-p', '-s', 'PTTYPE', '-o', 'value', SNAP], capture_output=True, text=True).stdout.strip()
         kind = subprocess.run(['blkid', '-p', '-s', 'TYPE', '-o', 'value', SNAP], capture_output=True, text=True).stdout.strip()
-        if kind not in ('exfat', 'vfat'):
+        # Blink can leave an old whole-disk exFAT signature when creating a partition.
+        if table_type in ('dos', 'gpt') or kind not in ('exfat', 'vfat'):
             table = json.loads(output('sfdisk', '--json', SNAP))['partitiontable']
             part = table['partitions'][0]
             sector = table.get('sectorsize', 512)

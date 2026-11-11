@@ -82,9 +82,13 @@ class InstallerTests(unittest.TestCase):
             with patch.object(usbcloud_client, 'POOL', pool), patch.object(usbcloud_client, 'attach_pool'), patch.object(install_client, 'run', return_value=SimpleNamespace(stdout='exfat\n')) as run:
                 install_client.initialize_storage()
                 self.assertNotIn(unittest.mock.call(install_client.CLIENT, 'init'), run.call_args_list)
-                run.return_value.stdout = 'ext4\n'
-                with self.assertRaisesRegex(RuntimeError, 'refusing to format'):
+                run.side_effect = subprocess.CalledProcessError(5, 'lvs')
+                with self.assertRaises(subprocess.CalledProcessError):
                     install_client.initialize_storage()
+                run.side_effect = None
+                run.return_value.stdout = 'ext4\n'
+                install_client.initialize_storage()
+                self.assertNotIn(unittest.mock.call(install_client.CLIENT, 'init'), run.call_args_list)
             self.assertEqual(pool.read_bytes(), b'recordings')
 
     def test_reboot_requires_interactive_acceptance(self):

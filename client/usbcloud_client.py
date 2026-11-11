@@ -14,6 +14,8 @@ import subprocess
 import time
 import secrets
 import socket
+import stat
+import re
 import urllib.request
 import urllib.parse
 from datetime import datetime, timezone
@@ -25,7 +27,7 @@ ORIGIN = f'/dev/{VG}/drive'
 SNAP = f'/dev/{VG}/capture'
 EXPORT = Path('/srv/blink-poc/snapshot') if Path('/srv/blink-poc').exists() else Path('/srv/usbcloud-client/snapshot')
 LEASE = BASE / 'snapshot.json'
-VERSION = '0.4.0'
+VERSION = '0.5.0'
 
 
 def timestamp():
@@ -232,12 +234,88 @@ def detach():
     print(json.dumps({'gadget_loaded': False}))
 
 
+# Only these drivers and options may be used for host-controlled filesystems.
+FILESYSTEM_READERS = {
+    'vfat': ('vfat', 'ro,nosuid,nodev,noexec,fmask=0133,dmask=0022'),
+    'exfat': ('exfat', 'ro,nosuid,nodev,noexec,fmask=0133,dmask=0022'),
+    'ntfs': ('ntfs3', 'ro,nosuid,nodev,noexec,fmask=0133,dmask=0022'),
+    'ext2': ('ext2', 'ro,nosuid,nodev,noexec'),
+    'ext3': ('ext4', 'ro,noload,nosuid,nodev,noexec'),
+    'ext4': ('ext4', 'ro,noload,nosuid,nodev,noexec'),
+}
+
+
+def probe_filesystem(device):
+    result = subprocess.run(['blkid', '-p', '-o', 'export', device], capture_output=True, text=True)
+    if result.returncode not in (0, 2):
+        raise RuntimeError('Filesystem probe failed or found ambiguous signatures: ' + device)
+    return dict(line.split('=', 1) for line in result.stdout.splitlines() if '=' in line)
+
+
+def snapshot_layout():
+    # Ask for the partition table independently: stale filesystem signatures can coexist.
+    table_type = subprocess.run(['blkid', '-p', '-s', 'PTTYPE', '-o', 'value', SNAP], capture_output=True, text=True)
+    if table_type.returncode not in (0, 2):
+        raise RuntimeError('Partition table probe failed or found ambiguous signatures')
+    if not table_type.stdout.strip():
+        return [{'id': 'disk', 'offset': 0, 'size': int(output('blockdev', '--getsize64', SNAP))}]
+    if table_type.stdout.strip() not in ('dos', 'gpt'):
+        raise RuntimeError('Unsupported partition table: ' + table_type.stdout.strip())
+    table = json.loads(output('sfdisk', '--json', SNAP))['partitiontable']
+    sector = table.get('sectorsize', 512)
+    disk_size = int(output('blockdev', '--getsize64', SNAP))
+    volumes = []
+    for index, part in enumerate(table.get('partitions', []), 1):
+        # Extended MBR partitions are containers, not filesystems.
+        if table['label'] == 'dos' and str(part.get('type', '')).lower() in ('5', 'f', '05', '0f', '85'):
+            continue
+        offset, size = part['start'] * sector, part['size'] * sector
+        if offset <= 0 or size <= 0 or offset + size > disk_size:
+            raise RuntimeError('Partition is outside the snapshot')
+        if any(offset < v['offset'] + v['size'] and v['offset'] < offset + size for v in volumes):
+            raise RuntimeError('Overlapping data partitions in snapshot')
+        number = re.search(r'(\d+)$', part.get('node', ''))
+        volume_id = 'p' + (number[1] if number else str(index))
+        if any(v['id'] == volume_id for v in volumes):
+            raise RuntimeError('Duplicate partition identity')
+        volumes.append({'id': volume_id, 'offset': offset, 'size': size})
+    if not volumes:
+        raise RuntimeError('No data partitions found in snapshot')
+    return volumes
+
+
+def volume_changes(volumes, previous):
+    before = {v['id']: v for v in previous}
+    after = {v['id']: v for v in volumes}
+    changes = []
+    for key, volume in after.items():
+        if key not in before:
+            changes.append({'volume_id': key, 'kind': 'added'})
+        elif volume['generation'] != before[key]['generation']:
+            changes.append({'volume_id': key, 'kind': 'reformatted', 'previous_generation': before[key]['generation']})
+    changes.extend({'volume_id': key, 'kind': 'removed'} for key in before if key not in after)
+    return changes
+
+
 def release(token=None, expired_only=False):
-    lease = json.loads(LEASE.read_text()) if LEASE.exists() else None
+    lease = read_json(LEASE)
     if expired_only and (lease is None or lease['expires_at'] > time.time()):
         return
     if token is not None and (lease is None or lease['token'] != token):
         raise RuntimeError('Snapshot token does not match; refusing to close it')
+    for volume in reversed((lease or {}).get('volumes', [])):
+        mount = Path(volume['mount'])
+        if os.path.ismount(mount):
+            run('umount', str(mount))
+            volume['mounted'] = False
+            write_json(LEASE, lease)
+        if volume.get('loop'):
+            run('losetup', '-d', volume['loop'])
+            volume['loop'] = None
+            write_json(LEASE, lease)
+        if mount.exists():
+            mount.rmdir()
+    # Also release leases created by older clients.
     if os.path.ismount(EXPORT):
         run('umount', str(EXPORT))
     if lease and lease.get('loop'):
@@ -257,69 +335,103 @@ def open_snapshot(timeout=600):
     EXPORT.mkdir(parents=True, exist_ok=True, mode=0o755)
     run('lvcreate', '--snapshot', '-L', '9G', '-n', 'capture', ORIGIN)
     lease = {'token': secrets.token_hex(16), 'expires_at': time.time() + timeout,
-             'path': str(EXPORT), 'loop': None}
-    # Persist cleanup state before any optional partition mapping or mount.
+             'path': str(EXPORT), 'loop': None, 'protocol': 2, 'volumes': []}
     write_json(LEASE, lease)
     try:
-        device = SNAP
-        table_type = subprocess.run(['blkid', '-p', '-s', 'PTTYPE', '-o', 'value', SNAP], capture_output=True, text=True).stdout.strip()
-        kind = subprocess.run(['blkid', '-p', '-s', 'TYPE', '-o', 'value', SNAP], capture_output=True, text=True).stdout.strip()
-        # Blink can leave an old whole-disk exFAT signature when creating a partition.
-        if table_type in ('dos', 'gpt') or kind not in ('exfat', 'vfat'):
-            table = json.loads(output('sfdisk', '--json', SNAP))['partitiontable']
-            part = table['partitions'][0]
-            sector = table.get('sectorsize', 512)
-            lease['loop'] = output('losetup', '--find', '--show', '--read-only', '--offset', str(part['start'] * sector), '--sizelimit', str(part['size'] * sector), SNAP)
+        run('blockdev', '--setro', SNAP)
+        for layout in snapshot_layout():
+            mount = EXPORT / 'volumes' / layout['id']
+            mount.mkdir(parents=True, exist_ok=True, mode=0o755)
+            volume = dict(layout, mount=str(mount), loop=None, mounted=False)
+            lease['volumes'].append(volume)
             write_json(LEASE, lease)
-            device = lease['loop']
-            kind = output('blkid', '-p', '-s', 'TYPE', '-o', 'value', device)
-        if kind not in ('exfat', 'vfat'):
-            raise RuntimeError('Unsupported filesystem in snapshot: ' + kind)
-        run('mount', '-t', kind, '-o', 'ro,nosuid,nodev,noexec,fmask=0133,dmask=0022', device, str(EXPORT))
-        lease['filesystem'] = kind
+            device = SNAP
+            if layout['offset']:
+                volume['loop'] = output('losetup', '--find', '--show', '--read-only', '--offset', str(layout['offset']), '--sizelimit', str(layout['size']), SNAP)
+                write_json(LEASE, lease)
+                device = volume['loop']
+            info = probe_filesystem(device)
+            volume.update(type=info.get('TYPE'), uuid=info.get('UUID'), label=info.get('LABEL'))
+            identity = [layout['offset'], layout['size'], volume['type'], volume['uuid']]
+            volume['generation'] = hashlib.sha256(json.dumps(identity).encode()).hexdigest()
+            reader = FILESYSTEM_READERS.get(volume['type'])
+            volume['supported'] = reader is not None
+            if reader:
+                try:
+                    run('mount', '-t', reader[0], '-o', reader[1], device, str(mount), stderr=subprocess.PIPE)
+                    volume['mounted'] = True
+                except subprocess.CalledProcessError as error:
+                    volume['error'] = 'Read-only mount failed (check driver availability or filesystem health): ' + (error.stderr or str(error)).strip()
+            else:
+                volume['error'] = 'Unsupported filesystem: ' + (volume['type'] or 'unknown or unformatted')
+            write_json(LEASE, lease)
+        previous = (read_json(BASE / 'inventory.json') or {}).get('volumes', [])
+        lease['volume_changes'] = volume_changes(lease['volumes'], previous)
         write_json(LEASE, lease)
-        event('Read-only snapshot opened.')
+        event('Read-only snapshot opened: ' + str(sum(v['mounted'] for v in lease['volumes'])) + ' readable volumes.')
         print(json.dumps(lease))
     except BaseException:
         release()
         raise
 
 
-def snapshot_manifest(token):
-    lease = json.loads(LEASE.read_text()) if LEASE.exists() else None
+def require_snapshot(token):
+    lease = read_json(LEASE)
     if not lease or not token or not secrets.compare_digest(lease['token'], token):
         raise RuntimeError('Snapshot token does not match')
-    if lease['expires_at'] <= time.time() or not os.path.ismount(EXPORT):
+    if lease['expires_at'] <= time.time():
         raise RuntimeError('Snapshot is expired or not mounted')
+    mounts = [v['mount'] for v in lease['volumes'] if v['mounted']] if 'volumes' in lease else [str(EXPORT)]
+    if any(not os.path.ismount(mount) for mount in mounts):
+        raise RuntimeError('Snapshot is expired or not mounted')
+    return lease
+
+
+def snapshot_manifest(token):
+    lease = require_snapshot(token)
     files = []
-    for path in sorted(EXPORT.rglob('*')):
-        if path.is_symlink() or not path.is_file():
+    volumes = lease.get('volumes', [{'mount': str(EXPORT), 'mounted': True, 'type': lease.get('filesystem')}])
+    for volume in volumes:
+        if not volume['mounted']:
             continue
-        digest = hashlib.sha256()
-        with path.open('rb') as source:
-            for chunk in iter(lambda: source.read(1024 * 1024), b''):
-                digest.update(chunk)
-        stat = path.stat()
-        files.append({'name': path.relative_to(EXPORT).as_posix(),
-                      'bytes': stat.st_size, 'sha256': digest.hexdigest(),
-                      'modified_at': datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat()})
-    disk = os.statvfs(EXPORT)
+        root = Path(volume['mount'])
+        # Never traverse symlinked directories, device nodes, sockets or FIFOs.
+        for directory, directories, names in os.walk(root, followlinks=False):
+            directories[:] = sorted(d for d in directories if not (Path(directory) / d).is_symlink())
+            for name in sorted(names):
+                path = Path(directory) / name
+                if not stat.S_ISREG(path.lstat().st_mode):
+                    continue
+                digest = hashlib.sha256()
+                with path.open('rb') as source:
+                    for chunk in iter(lambda: source.read(1024 * 1024), b''):
+                        if lease['expires_at'] <= time.time():
+                            raise RuntimeError('Snapshot expired while hashing')
+                        digest.update(chunk)
+                details = path.stat()
+                entry = {'name': path.relative_to(EXPORT).as_posix(),
+                         'bytes': details.st_size, 'sha256': digest.hexdigest(),
+                         'modified_at': datetime.fromtimestamp(details.st_mtime, timezone.utc).isoformat()}
+                if 'id' in volume:
+                    entry.update(volume_id=volume['id'], volume_generation=volume['generation'], source_path=path.relative_to(root).as_posix())
+                files.append(entry)
+        disk = os.statvfs(root)
+        volume.update(total_bytes=disk.f_blocks * disk.f_frsize,
+                      free_bytes=disk.f_bavail * disk.f_frsize,
+                      used_bytes=(disk.f_blocks - disk.f_bfree) * disk.f_frsize)
+    readable = [v for v in volumes if v['mounted']]
     inventory = {'scanned_at': timestamp(), 'files': files,
-                 'filesystem': {'type': lease.get('filesystem'), 'mount': str(EXPORT),
-                                'total_bytes': disk.f_blocks * disk.f_frsize,
-                                'free_bytes': disk.f_bavail * disk.f_frsize,
-                                'used_bytes': (disk.f_blocks - disk.f_bfree) * disk.f_frsize}}
+                 'filesystem': {'type': readable[0]['type'] if len(readable) == 1 else ('multiple' if readable else None), 'mount': str(EXPORT),
+                                **{key: sum(v[key] for v in readable) for key in ('total_bytes', 'free_bytes', 'used_bytes')}}}
+    if 'volumes' in lease:
+        inventory.update(protocol=2, volumes=[{k: v for k, v in volume.items() if k != 'loop'} for volume in volumes], volume_changes=lease['volume_changes'])
     write_json(BASE / 'inventory.json', {key: value for key, value in inventory.items() if key != 'files'})
     event(f'Manifest complete: {len(files)} files hashed.', 'ok')
     return inventory
 
 
 def snapshot_read(token, encoded_path):
-    lease = read_json(LEASE)
-    if not lease or not token or not secrets.compare_digest(lease['token'], token):
-        raise RuntimeError('Snapshot token does not match')
-    if lease['expires_at'] <= time.time() or not os.path.ismount(EXPORT):
-        raise RuntimeError('Snapshot is expired or not mounted')
+    lease = require_snapshot(token)
     name = base64.b64decode(encoded_path, altchars=b'-_', validate=True).decode('utf-8')
     relative = Path(name)
     if relative.is_absolute() or not name or any(part in ('', '.', '..') for part in name.split('/')) or any(ord(c) < 32 or ord(c) == 127 or c == chr(92) for c in name):
@@ -331,6 +443,12 @@ def snapshot_read(token, encoded_path):
             break
         if part.is_symlink():
             raise RuntimeError('Symlinks cannot be read')
+    if 'volumes' in lease:
+        volume = next((v for v in lease['volumes'] if v['mounted'] and path.is_relative_to(Path(v['mount']))), None)
+        if volume is None:
+            raise RuntimeError('Path is outside a readable volume')
+    if not stat.S_ISREG(path.stat().st_mode):
+        raise RuntimeError('Only regular files can be read')
     with path.open('rb') as source:
         while chunk := source.read(1024 * 1024):
             if lease['expires_at'] <= time.time():

@@ -5,6 +5,7 @@ namespace App\Services;
 use Closure;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -98,9 +99,22 @@ class UsbCloudClient
                     throw new RuntimeException('The Pi returned an unsafe or invalid manifest entry.');
                 }
             }
-            $inventory = ['at' => now()->toIso8601String(), 'files' => $manifest['files'], 'filesystem' => $manifest['filesystem'] ?? null];
+            $this->validateVolumes($manifest);
+            $inventory = ['at' => now()->toIso8601String(), 'files' => $manifest['files'], 'filesystem' => $manifest['filesystem'] ?? null, 'volumes' => $manifest['volumes'] ?? [], 'volume_changes' => $manifest['volume_changes'] ?? []];
+            $run['volumes'] = $inventory['volumes'];
+            $run['volume_changes'] = $inventory['volume_changes'];
             File::replace($this->directory().'/inventory.json', json_encode($inventory, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
+            foreach ($inventory['volume_changes'] as $change) {
+                $run['log'][] = 'Volume '.$change['volume_id'].': '.$change['kind'].'.';
+            }
             $newFiles = array_filter($manifest['files'], fn (array $entry): bool => ! (File::isFile($this->directory().'/objects/'.$entry['sha256']) && File::size($this->directory().'/objects/'.$entry['sha256']) === $entry['bytes'] && hash_file('sha256', $this->directory().'/objects/'.$entry['sha256']) === $entry['sha256']));
+            $newFiles = array_column($newFiles, null, 'sha256');
+            $recorded = [];
+            foreach ($this->runs(null) as $savedRun) {
+                foreach (array_merge($savedRun['files'], $savedRun['reused_files'] ?? []) as $saved) {
+                    $recorded[$saved['name']."\0".$saved['sha256']."\0".($saved['volume_generation'] ?? '')] = true;
+                }
+            }
             $totalBytes = array_sum(array_column($newFiles, 'bytes'));
             $doneBytes = 0;
             $onProgress?->__invoke(['stage' => 'Transferring', 'total_files' => count($newFiles), 'total_bytes' => $totalBytes, 'done_files' => 0, 'done_bytes' => 0, 'skipped' => count($manifest['files']) - count($newFiles)]);
@@ -114,6 +128,12 @@ class UsbCloudClient
                 $digest = $entry['sha256'];
                 $destination = $this->directory().'/objects/'.$digest;
                 if (File::isFile($destination) && File::size($destination) === $entry['bytes'] && hash_file('sha256', $destination) === $digest) {
+                    $entry['export_path'] = app(UsbCloudExports::class)->save($this->directory(), $destination, $entry);
+                    $key = $entry['name']."\0".$entry['sha256']."\0".($entry['volume_generation'] ?? '');
+                    if (! isset($recorded[$key])) {
+                        $run['reused_files'][] = [...$entry, 'id' => null];
+                        $recorded[$key] = true;
+                    }
                     $run['already_saved']++;
                     $this->onOutput?->__invoke('Skipping already saved: '.$entry['name']."\n");
 
@@ -126,7 +146,7 @@ class UsbCloudClient
                 $this->onOutput?->__invoke('Transferring new file: '.$entry['name']."\n");
                 $onProgress?->__invoke(['current_file' => $entry['name'], 'current_bytes' => 0, 'current_total' => $entry['bytes']]);
                 $limit = (float) ($this->connection['bandwidth'] ?? 0);
-                $streaming = ($this->connection['transfer_protocol'] ?? config('usbcloud-client.transfer_protocol')) === 'stream';
+                $streaming = ($manifest['protocol'] ?? 1) === 2 || ($this->connection['transfer_protocol'] ?? config('usbcloud-client.transfer_protocol')) === 'stream';
                 $command = ['scp', ...($limit > 0 ? ['-l', (string) max(1, (int) ($limit * 8000))] : []), ...$this->options(), $this->target().':'.$snapshotPath.'/'.$entry['name'], $temporary];
                 if ($streaming) {
                     $encoded = strtr(base64_encode($entry['name']), '+/', '-_');
@@ -144,8 +164,15 @@ class UsbCloudClient
                     'id' => count($run['files']), 'name' => $entry['name'],
                     'bytes' => $entry['bytes'], 'sha256' => $digest,
                     'modified_at' => $entry['modified_at'] ?? null,
+                    ...array_intersect_key($entry, array_flip(['volume_id', 'volume_generation', 'source_path'])),
                     'video' => strtolower(pathinfo($entry['name'], PATHINFO_EXTENSION)) === 'mp4',
                 ];
+                $export = app(UsbCloudExports::class)->save($this->directory(), $destination, $entry);
+                $run['files'][array_key_last($run['files'])]['export_path'] = $export;
+            }
+            $errors = array_filter(array_column($inventory['volumes'], 'error'));
+            if ($errors) {
+                throw new RuntimeException(implode('; ', $errors));
             }
             $run['success'] = true;
             $run['log'][] = $copy
@@ -173,6 +200,53 @@ class UsbCloudClient
         File::put($directory.'/result.json', json_encode($run, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
 
         return $run;
+    }
+
+    /** @param array<string, mixed> $manifest */
+    private function validateVolumes(array $manifest): void
+    {
+        if (! isset($manifest['protocol'])) {
+            foreach ($manifest['files'] as $entry) {
+                if (is_array($entry) && array_intersect(['volume_id', 'volume_generation', 'source_path'], array_keys($entry))) {
+                    throw new RuntimeException('Volume files require protocol version 2.');
+                }
+            }
+
+            return;
+        }
+        $validator = Validator::make($manifest, [
+            'protocol' => ['required', 'integer', 'in:2'],
+            'volumes' => ['required', 'array', 'list', 'min:1', 'max:128'],
+            'volumes.*.id' => ['required', 'string', 'distinct', 'regex:/\A(?:disk|p[1-9][0-9]*)\z/'],
+            'volumes.*.generation' => ['required', 'string', 'regex:/\A[a-f0-9]{64}\z/'],
+            'volumes.*.mounted' => ['required', 'boolean'],
+            'volumes.*.type' => ['present', 'nullable', 'string', 'max:64'],
+            'volumes.*.error' => ['sometimes', 'string', 'max:8192'],
+            'volume_changes' => ['present', 'array', 'list'],
+            'volume_changes.*.volume_id' => ['required', 'string', 'regex:/\A(?:disk|p[1-9][0-9]*)\z/'],
+            'volume_changes.*.kind' => ['required', 'in:added,removed,reformatted'],
+            'files.*.volume_id' => ['required', 'string'],
+            'files.*.volume_generation' => ['required', 'string'],
+            'files.*.source_path' => ['required', 'string', 'max:4096'],
+        ]);
+        if ($validator->fails()) {
+            throw new RuntimeException('The Pi returned invalid volume metadata.');
+        }
+        $volumes = array_column($manifest['volumes'], null, 'id');
+        foreach ($manifest['files'] as $entry) {
+            $volume = $volumes[$entry['volume_id']] ?? null;
+            if (! $volume || ! $volume['mounted'] || $entry['volume_generation'] !== $volume['generation']
+                || $entry['name'] !== 'volumes/'.$entry['volume_id'].'/'.$entry['source_path']
+                || ! $this->safeRelativePath($entry['source_path'])) {
+                throw new RuntimeException('The Pi returned an unsafe volume file reference.');
+            }
+        }
+    }
+
+    private function safeRelativePath(string $path): bool
+    {
+        return ! preg_match('/[\x00-\x1f\x7f\\\\]/', $path) && ! str_starts_with($path, '/')
+            && ! collect(explode('/', $path))->contains(fn (string $part): bool => in_array($part, ['', '.', '..'], true));
     }
 
     /** @param list<string> $command */

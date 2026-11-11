@@ -163,11 +163,9 @@ WantedBy=timers.target
 
 def initialize_storage():
     if usbcloud_client.POOL.exists():
-        # An interrupted init can leave a pool without a usable filesystem.
+        # Validate our backing volume, not the filesystem chosen by the USB host.
         usbcloud_client.attach_pool()
-        result = run('blkid', '-s', 'TYPE', '-o', 'value', usbcloud_client.ORIGIN, capture_output=True)
-        if result.stdout.strip() != 'exfat':
-            raise RuntimeError('Existing USBCloud storage is incomplete or not exFAT; refusing to format it.')
+        run('lvs', '--noheadings', usbcloud_client.ORIGIN)
         print('Preserving existing USB storage and recordings.')
         return
     usbcloud_client.BASE.mkdir(parents=True, mode=0o700, exist_ok=True)

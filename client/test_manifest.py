@@ -1,4 +1,5 @@
 import hashlib
+import subprocess
 import json
 from pathlib import Path
 import tempfile
@@ -90,19 +91,21 @@ class SnapshotTimeoutTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             lease = root / 'snapshot.json'
-            with patch.object(usbcloud_client, 'BASE', root), patch.object(usbcloud_client, 'LEASE', lease), patch.object(usbcloud_client, 'SNAP', str(root / 'capture')), patch.object(usbcloud_client, 'EXPORT', root / 'export'), patch.object(usbcloud_client, 'attach_pool'), patch.object(usbcloud_client, 'release'), patch.object(usbcloud_client, 'run'), patch('subprocess.run', return_value=SimpleNamespace(stdout='exfat')), patch('time.time', return_value=100), contextlib.redirect_stdout(io.StringIO()):
+            with patch.object(usbcloud_client, 'BASE', root), patch.object(usbcloud_client, 'LEASE', lease), patch.object(usbcloud_client, 'SNAP', str(root / 'capture')), patch.object(usbcloud_client, 'EXPORT', root / 'export'), patch.object(usbcloud_client, 'attach_pool'), patch.object(usbcloud_client, 'release'), patch.object(usbcloud_client, 'run'), patch.object(usbcloud_client, 'snapshot_layout', return_value=[{'id': 'disk', 'offset': 0, 'size': 1024}]), patch.object(usbcloud_client, 'probe_filesystem', return_value={'TYPE': 'exfat'}), patch('time.time', return_value=100), contextlib.redirect_stdout(io.StringIO()):
                 usbcloud_client.open_snapshot(900)
             self.assertEqual(json.loads(lease.read_text())['expires_at'], 1000)
 
 class SnapshotFilesystemTest(unittest.TestCase):
     def open_snapshot(self, root, table_type='', filesystem='exfat', mount_error=None):
         def probe(args, **kwargs):
-            return SimpleNamespace(stdout=table_type if 'PTTYPE' in args else filesystem)
+            return SimpleNamespace(returncode=0, stdout=table_type if 'PTTYPE' in args else 'TYPE=' + filesystem + '\nUUID=1234')
 
         def command(*args, **kwargs):
+            if args[0] == 'blockdev':
+                return SimpleNamespace(stdout='8589934592')
             if args[0] == 'sfdisk':
                 return SimpleNamespace(stdout=json.dumps({'partitiontable': {
-                    'sectorsize': 512, 'partitions': [{'start': 32, 'size': 16777184}],
+                    'label': table_type, 'sectorsize': 512, 'partitions': [{'start': 32, 'size': 16777184}],
                 }}))
             if args[0] == 'losetup':
                 return SimpleNamespace(stdout='/dev/loop1\n')
@@ -115,12 +118,7 @@ class SnapshotFilesystemTest(unittest.TestCase):
         import contextlib
         import io
         with patch.object(usbcloud_client, 'BASE', root), patch.object(usbcloud_client, 'LEASE', root / 'snapshot.json'), patch.object(usbcloud_client, 'SNAP', str(root / 'capture')), patch.object(usbcloud_client, 'EXPORT', root / 'export'), patch.object(usbcloud_client, 'attach_pool'), patch.object(usbcloud_client, 'release') as release, patch.object(usbcloud_client, 'run', side_effect=command) as run, patch('subprocess.run', side_effect=probe), contextlib.redirect_stdout(io.StringIO()):
-            if mount_error or filesystem not in ('exfat', 'vfat'):
-                with self.assertRaises(type(mount_error) if mount_error else RuntimeError):
-                    usbcloud_client.open_snapshot()
-                release.assert_any_call()
-            else:
-                usbcloud_client.open_snapshot()
+            usbcloud_client.open_snapshot()
             return run
 
     def test_mounts_partition_instead_of_stale_whole_disk_signature(self):
@@ -129,24 +127,28 @@ class SnapshotFilesystemTest(unittest.TestCase):
                 root = Path(folder)
                 run = self.open_snapshot(root, table_type=table_type)
                 run.assert_any_call('losetup', '--find', '--show', '--read-only', '--offset', '16384', '--sizelimit', '8589918208', str(root / 'capture'), stdout=-1)
-                run.assert_any_call('mount', '-t', 'exfat', '-o', 'ro,nosuid,nodev,noexec,fmask=0133,dmask=0022', '/dev/loop1', str(root / 'export'))
-                self.assertEqual(json.loads((root / 'snapshot.json').read_text())['loop'], '/dev/loop1')
+                run.assert_any_call('mount', '-t', 'exfat', '-o', 'ro,nosuid,nodev,noexec,fmask=0133,dmask=0022', '/dev/loop1', str(root / 'export/volumes/p1'), stderr=subprocess.PIPE)
+                self.assertEqual(json.loads((root / 'snapshot.json').read_text())['volumes'][0]['loop'], '/dev/loop1')
 
     def test_mounts_unpartitioned_filesystems_directly(self):
         for filesystem in ('exfat', 'vfat'):
             with self.subTest(filesystem=filesystem), tempfile.TemporaryDirectory() as folder:
                 root = Path(folder)
                 run = self.open_snapshot(root, filesystem=filesystem)
-                run.assert_any_call('mount', '-t', filesystem, '-o', 'ro,nosuid,nodev,noexec,fmask=0133,dmask=0022', str(root / 'capture'), str(root / 'export'))
+                run.assert_any_call('mount', '-t', filesystem, '-o', 'ro,nosuid,nodev,noexec,fmask=0133,dmask=0022', str(root / 'capture'), str(root / 'export/volumes/disk'), stderr=subprocess.PIPE)
                 self.assertFalse(any(call.args[0] == 'losetup' for call in run.call_args_list))
 
-    def test_releases_snapshot_when_partition_mount_fails(self):
+    def test_reports_partition_mount_failure_without_hiding_other_volumes(self):
         with tempfile.TemporaryDirectory() as folder:
-            self.open_snapshot(Path(folder), table_type='dos', mount_error=RuntimeError('mount failed'))
+            root = Path(folder)
+            self.open_snapshot(root, table_type='dos', mount_error=subprocess.CalledProcessError(32, 'mount', stderr='dirty filesystem'))
+            volume = json.loads((root / 'snapshot.json').read_text())['volumes'][0]
+            self.assertFalse(volume['mounted'])
+            self.assertIn('dirty filesystem', volume['error'])
 
-    def test_rejects_unsupported_partition_filesystem_and_releases_snapshot(self):
+    def test_reports_unsupported_partition_without_attempting_a_mount(self):
         with tempfile.TemporaryDirectory() as folder:
-            run = self.open_snapshot(Path(folder), table_type='dos', filesystem='ext4')
+            run = self.open_snapshot(Path(folder), table_type='dos', filesystem='crypto_LUKS')
             self.assertFalse(any(call.args[0] == 'mount' for call in run.call_args_list))
 
 class RestrictedSshTest(unittest.TestCase):

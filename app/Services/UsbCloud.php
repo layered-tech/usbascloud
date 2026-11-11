@@ -89,6 +89,7 @@ class UsbCloud
                 'gadget_loaded' => $state['gadget_loaded'] ?? null,
                 'usb_state' => implode(', ', $state['usb_state'] ?? []),
                 'firmware' => $state['version'] ?? null, 'uptime_seconds' => $state['uptime_seconds'] ?? null,
+                'volumes' => $inventory['volumes'] ?? [], 'volume_changes' => $inventory['volume_changes'] ?? [],
                 'filesystem' => $filesystem, 'pending' => $pending,
                 'next_sync' => Cache::get('usbcloud.next_sync.'.$id), 'last_sync' => $lastSync['at'] ?? null, 'scanned_at' => $inventory['at'] ?? null,
                 'checked_at' => $status['checked_at'],
@@ -112,7 +113,7 @@ class UsbCloud
             'files' => collect($files)->sortByDesc(fn (array $file): string => $file['modified_at'] ?? $file['saved_at'] ?? '')->values()->all(),
             'logs' => $this->logs($logDevices),
             'settings' => $this->settings(),
-            'server' => ['ssh_public_key' => File::isFile(config('usbcloud-client.identity').'.pub') ? trim(File::get(config('usbcloud-client.identity').'.pub')) : null, 'worker_last_seen' => Cache::get('usbcloud.worker_seen'), 'client_version' => '0.4.0', 'url' => config('app.url'), 'storage_root' => config('usbcloud.archive_directory') ?: config('usbcloud-client.directory'), 'scheduler_last_seen' => Cache::get('usbcloud.scheduler_seen')],
+            'server' => ['ssh_public_key' => File::isFile(config('usbcloud-client.identity').'.pub') ? trim(File::get(config('usbcloud-client.identity').'.pub')) : null, 'worker_last_seen' => Cache::get('usbcloud.worker_seen'), 'client_version' => '0.5.0', 'url' => config('app.url'), 'storage_root' => config('usbcloud.archive_directory') ?: config('usbcloud-client.directory'), 'scheduler_last_seen' => Cache::get('usbcloud.scheduler_seen')],
         ];
     }
 
@@ -135,8 +136,8 @@ class UsbCloud
     {
         $files = [];
         foreach ($client->runs(null) as $run) {
-            foreach ($run['files'] as $entry) {
-                $key = hash('sha256', $id."\0".$entry['name']."\0".$entry['sha256']);
+            foreach (array_merge($run['files'], $run['reused_files'] ?? []) as $entry) {
+                $key = hash('sha256', $id."\0".$entry['name']."\0".$entry['sha256'].(isset($entry['volume_generation']) ? "\0".$entry['volume_generation'] : ''));
                 if (isset($files[$key]) || $client->filePath($run['id'], $entry) === null) {
                     continue;
                 }
@@ -148,7 +149,7 @@ class UsbCloud
             }
         }
         foreach ($inventory['files'] ?? [] as $entry) {
-            $key = hash('sha256', $id."\0".$entry['name']."\0".$entry['sha256']);
+            $key = hash('sha256', $id."\0".$entry['name']."\0".$entry['sha256'].(isset($entry['volume_generation']) ? "\0".$entry['volume_generation'] : ''));
             if (isset($files[$key])) {
                 $files[$key]['on_device'] = true;
                 $files[$key]['modified_at'] = $entry['modified_at'] ?? $files[$key]['modified_at'];

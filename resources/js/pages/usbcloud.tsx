@@ -14,6 +14,21 @@ type LogPaneState = { id: string; source: string };
 type LogRowState = { id: string; panes: LogPaneState[] };
 type Screen = 'devices' | 'device' | 'files' | 'gallery' | 'log' | 'settings';
 type Status = 'online' | 'syncing' | 'offline' | 'fault';
+type Volume = {
+    id: string;
+    generation: string;
+    type: string | null;
+    uuid?: string | null;
+    label?: string | null;
+    mounted: boolean;
+    error?: string;
+    total_bytes?: number;
+    free_bytes?: number;
+};
+type VolumeChange = {
+    volume_id: string;
+    kind: 'added' | 'removed' | 'reformatted';
+};
 type Device = {
     id: string;
     name: string;
@@ -25,6 +40,8 @@ type Device = {
     usb_state: string;
     firmware: string | null;
     uptime_seconds: number | null;
+    volumes?: Volume[];
+    volume_changes?: VolumeChange[];
     filesystem: {
         type: string | null;
         mount: string;
@@ -56,6 +73,10 @@ type Device = {
     transfer: Transfer | null;
 };
 type StoredFile = {
+    source_path?: string;
+    volume_id?: string;
+    volume_generation?: string;
+    export_path?: string | null;
     id: string;
     device: string;
     name: string;
@@ -1949,6 +1970,68 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                         ['Last file', d.last_file],
                     ]}
                 />
+                {!!d.volumes?.length && (
+                    <details className="uc-stack">
+                        <summary className="uc-label">
+                            Volumes · {d.volumes.length}
+                        </summary>
+                        <div className="uc-stack">
+                            {d.volumes.map((volume) => (
+                                <div key={volume.id} className="uc-stack">
+                                    <Details
+                                        items={[
+                                            [
+                                                'Volume',
+                                                volume.label
+                                                    ? `${volume.id} · ${volume.label}`
+                                                    : volume.id,
+                                            ],
+                                            [
+                                                'Filesystem',
+                                                volume.type ?? 'Unknown',
+                                            ],
+                                            [
+                                                'Last scan',
+                                                volume.mounted
+                                                    ? 'Readable'
+                                                    : 'Unreadable',
+                                            ],
+                                            [
+                                                'Capacity',
+                                                bytes(volume.total_bytes),
+                                            ],
+                                            ['Free', bytes(volume.free_bytes)],
+                                            [
+                                                'UUID',
+                                                volume.uuid ?? 'Unavailable',
+                                            ],
+                                            ['Generation', volume.generation],
+                                        ]}
+                                    />
+                                    {volume.error && (
+                                        <ErrorSummary
+                                            message={volume.error}
+                                            theme={theme}
+                                        />
+                                    )}
+                                </div>
+                            ))}
+                            {d.volume_changes?.map((change) => (
+                                <p
+                                    key={`${change.volume_id}-${change.kind}`}
+                                    className="uc-data uc-muted"
+                                >
+                                    {change.volume_id} ·{' '}
+                                    {change.kind === 'reformatted'
+                                        ? 'Reformatted or replaced since the previous scan'
+                                        : change.kind === 'removed'
+                                          ? 'Removed since the previous scan'
+                                          : 'New volume detected'}
+                                </p>
+                            ))}
+                        </div>
+                    </details>
+                )}
                 <div className="uc-detail-footer uc-card-actions">
                     <Button
                         small
@@ -2006,7 +2089,18 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                         ],
                         ['State', f.state],
                         ['Source', f.on_device ? 'On USB' : 'Archive only'],
-                        ['Path', f.name],
+                        ['Path', f.source_path ?? f.name],
+                        ...(f.volume_id
+                            ? [['Volume', f.volume_id] as [string, ReactNode]]
+                            : []),
+                        ...(f.export_path
+                            ? [
+                                  ['Readable export', f.export_path] as [
+                                      string,
+                                      ReactNode,
+                                  ],
+                              ]
+                            : []),
                         [
                             'Server',
                             f.state === 'pulled'

@@ -1950,6 +1950,62 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
             </section>
         );
     }
+    function volumeDetails(d: Device) {
+        if (!d.volumes?.length) {
+            return (
+                <p className="uc-data uc-muted">
+                    Volume details appear after the next scan or pull with an
+                    updated client.
+                </p>
+            );
+        }
+        return (
+            <div className="uc-stack">
+                {d.volumes.map((volume) => (
+                    <div key={volume.id} className="uc-stack">
+                        <Details
+                            items={[
+                                [
+                                    'Volume',
+                                    volume.label
+                                        ? `${volume.id} · ${volume.label}`
+                                        : volume.id,
+                                ],
+                                ['Filesystem', volume.type ?? 'Unknown'],
+                                [
+                                    'Last scan',
+                                    volume.mounted ? 'Readable' : 'Unreadable',
+                                ],
+                                ['Capacity', bytes(volume.total_bytes)],
+                                ['Free', bytes(volume.free_bytes)],
+                                ['UUID', volume.uuid ?? 'Unavailable'],
+                                ['Generation', volume.generation],
+                            ]}
+                        />
+                        {volume.error && (
+                            <ErrorSummary
+                                message={volume.error}
+                                theme={theme}
+                            />
+                        )}
+                    </div>
+                ))}
+                {d.volume_changes?.map((change) => (
+                    <p
+                        key={`${change.volume_id}-${change.kind}`}
+                        className="uc-data uc-muted"
+                    >
+                        {change.volume_id} ·{' '}
+                        {change.kind === 'reformatted'
+                            ? 'Reformatted or replaced since the previous scan'
+                            : change.kind === 'removed'
+                              ? 'Removed since the previous scan'
+                              : 'New volume detected'}
+                    </p>
+                ))}
+            </div>
+        );
+    }
     function deviceDetails(d: Device) {
         return (
             <section className="uc-detail-card">
@@ -1975,61 +2031,7 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                         <summary className="uc-label">
                             Volumes · {d.volumes.length}
                         </summary>
-                        <div className="uc-stack">
-                            {d.volumes.map((volume) => (
-                                <div key={volume.id} className="uc-stack">
-                                    <Details
-                                        items={[
-                                            [
-                                                'Volume',
-                                                volume.label
-                                                    ? `${volume.id} · ${volume.label}`
-                                                    : volume.id,
-                                            ],
-                                            [
-                                                'Filesystem',
-                                                volume.type ?? 'Unknown',
-                                            ],
-                                            [
-                                                'Last scan',
-                                                volume.mounted
-                                                    ? 'Readable'
-                                                    : 'Unreadable',
-                                            ],
-                                            [
-                                                'Capacity',
-                                                bytes(volume.total_bytes),
-                                            ],
-                                            ['Free', bytes(volume.free_bytes)],
-                                            [
-                                                'UUID',
-                                                volume.uuid ?? 'Unavailable',
-                                            ],
-                                            ['Generation', volume.generation],
-                                        ]}
-                                    />
-                                    {volume.error && (
-                                        <ErrorSummary
-                                            message={volume.error}
-                                            theme={theme}
-                                        />
-                                    )}
-                                </div>
-                            ))}
-                            {d.volume_changes?.map((change) => (
-                                <p
-                                    key={`${change.volume_id}-${change.kind}`}
-                                    className="uc-data uc-muted"
-                                >
-                                    {change.volume_id} ·{' '}
-                                    {change.kind === 'reformatted'
-                                        ? 'Reformatted or replaced since the previous scan'
-                                        : change.kind === 'removed'
-                                          ? 'Removed since the previous scan'
-                                          : 'New volume detected'}
-                                </p>
-                            ))}
-                        </div>
+                        {volumeDetails(d)}
                     </details>
                 )}
                 <div className="uc-detail-footer uc-card-actions">
@@ -3041,6 +3043,25 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                                         ],
                                                     ]}
                                                 />
+                                            </section>
+                                            <section
+                                                className="uc-detail-card"
+                                                aria-label="Device volumes"
+                                            >
+                                                <h2 className="uc-heading">
+                                                    Volumes
+                                                </h2>
+                                                <p className="uc-data uc-muted">
+                                                    Last scanned{' '}
+                                                    {active.scanned_at
+                                                        ? date(
+                                                              active.scanned_at,
+                                                          )
+                                                        : 'never'}
+                                                    . Readability reflects that
+                                                    scan.
+                                                </p>
+                                                {volumeDetails(active)}
                                             </section>
                                             {active.transfer &&
                                             ![

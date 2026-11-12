@@ -6,6 +6,10 @@ import {addDevice, discover, download, file as downloadFile, operate, removeDevi
 import {store as createInstallation} from '@/actions/App/Http/Controllers/ClientInstallationController';
 import {Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger,} from '@/components/ui/dialog';
 import {MultiSelect, MultiSelectTheme} from '@/components/multi-select';
+import type {DeviceMetrics} from '@/lib/device-health';
+import {deviceHealth} from '@/lib/device-health';
+import type {TransferDismissals} from '@/lib/transfer-dismissals';
+import {dismissTransferRuns, parseTransferDismissals, transferDismissalsKey, visibleTransferDevices,} from '@/lib/transfer-dismissals';
 import '../../css/usbcloud.css';
 
 type Theme = 'phosphor' | 'paper';
@@ -55,15 +59,7 @@ type Device = {
     scanned_at: string | null;
     checked_at: string | null;
     status_source: 'ssh' | 'heartbeat';
-    metrics: {
-        cpu_temperature_c?: number | null;
-        load_1m?: number | null;
-        cpu_count?: number | null;
-        memory_used_percent?: number | null;
-        root_used_percent?: number | null;
-        root_free_bytes?: number | null;
-        throttled_flags?: number | null;
-    } | null;
+    metrics: DeviceMetrics | null;
     health_warnings: string[];
     last_file: string | null;
     hostname: string | null;
@@ -124,6 +120,11 @@ type Cloud = {
         url: string;
         storage_root: string;
         scheduler_last_seen: string | null;
+        installer_profiles: {
+            id: string;
+            name: string;
+            description: string;
+        }[];
     };
 };
 
@@ -297,13 +298,19 @@ function Field({
         </label>
     );
 }
-function Meter({ device }: { device: Device }) {
+function Meter({
+    device,
+    label = 'Storage',
+}: {
+    device: Device;
+    label?: string;
+}) {
     const fs = device.filesystem;
     const used = fs ? Math.ceil((fs.used_bytes / fs.total_bytes) * 24) : 0;
     return (
         <div className="uc-meter">
             <div className="uc-meter-head">
-                <span className="uc-label uc-muted">Storage</span>
+                <span className="uc-label uc-muted">{label}</span>
                 <span className="uc-data">
                     <strong>{bytes(fs?.used_bytes)}</strong> /{' '}
                     <span className="uc-muted">{bytes(fs?.total_bytes)}</span>
@@ -332,7 +339,225 @@ function Meter({ device }: { device: Device }) {
         </div>
     );
 }
-function LogPane({ entries, title }: { entries: LogEntry[]; title: string }) {
+function HealthTiles({ device }: { device: Device }) {
+    const metrics = device.metrics;
+    const health = deviceHealth(
+        metrics,
+        device.status === 'offline',
+        device.health_warnings,
+    );
+    const tiles = [
+        {
+            label: 'CPU temp',
+            value:
+                metrics?.cpu_temperature_c != null
+                    ? `${metrics.cpu_temperature_c.toFixed(1)} °C`
+                    : '—',
+            percent:
+                metrics?.cpu_temperature_c != null
+                    ? (metrics.cpu_temperature_c / 85) * 100
+                    : null,
+            high: health.temperatureHigh,
+            flag: 'Hot',
+            note: 'throttles at 85 °C',
+        },
+        {
+            label: 'CPU load',
+            value: metrics?.load_1m != null ? metrics.load_1m.toFixed(2) : '—',
+            percent: health.loadPercent,
+            high: health.loadHigh,
+            flag: 'High',
+            note: `1 min average${metrics?.cpu_count ? ` · ${metrics.cpu_count} cores` : ''}`,
+        },
+        {
+            label: 'Memory',
+            value:
+                metrics?.memory_used_percent != null
+                    ? `${metrics.memory_used_percent.toFixed(1)}%`
+                    : '—',
+            percent: metrics?.memory_used_percent ?? null,
+            high: health.memoryHigh,
+            flag: 'High',
+            note: 'of system memory used',
+        },
+        {
+            label: 'System disk',
+            value:
+                metrics?.root_used_percent != null
+                    ? `${metrics.root_used_percent}%`
+                    : '—',
+            percent: metrics?.root_used_percent ?? null,
+            high: health.diskHigh,
+            flag: 'Full',
+            note:
+                metrics?.root_free_bytes != null
+                    ? `${bytes(metrics.root_free_bytes)} free`
+                    : 'Free space unavailable',
+        },
+        {
+            label: 'Throttling',
+            value:
+                metrics?.throttled_flags == null
+                    ? '—'
+                    : health.currentFlags.length
+                      ? `${health.currentFlags.length} ${health.currentFlags.length === 1 ? 'flag' : 'flags'}`
+                      : 'Clear',
+            percent: null,
+            high: health.currentFlags.length > 0,
+            flag: 'Active',
+            note:
+                metrics?.throttled_flags == null
+                    ? 'Flags unavailable'
+                    : health.currentFlags.length
+                      ? health.currentFlags.join(' · ')
+                      : health.pastFlags.length
+                        ? `OK · earlier ${health.pastFlags.join(', ')}`
+                        : 'No flags raised',
+        },
+    ];
+
+    return (
+        <section className="uc-health-tiles" aria-label="Device health">
+            {tiles.map((tile) => {
+                const high = tile.high && !health.stale;
+                const percent = Math.max(0, Math.min(100, tile.percent ?? 0));
+
+                return (
+                    <div
+                        key={tile.label}
+                        className={`uc-health-tile ${high ? 'uc-health-high' : ''} ${health.stale ? 'uc-health-stale' : ''}`}
+                    >
+                        <div className="uc-panel-heading">
+                            <h2 className="uc-label uc-muted">{tile.label}</h2>
+                            <span
+                                className={`uc-label uc-health-flag ${high ? 'uc-inverse' : 'uc-muted'}`}
+                            >
+                                {tile.value === '—'
+                                    ? 'No data'
+                                    : health.stale
+                                      ? 'Stale'
+                                      : high
+                                        ? tile.flag
+                                        : 'OK'}
+                            </span>
+                        </div>
+                        <div className="uc-health-value">{tile.value}</div>
+                        {tile.label !== 'Throttling' && (
+                            <div
+                                className="uc-meter-track"
+                                role="meter"
+                                aria-label={tile.label}
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                                aria-valuenow={percent}
+                                aria-valuetext={
+                                    tile.value === '—'
+                                        ? 'Not reported'
+                                        : `${tile.value}${health.stale ? ' · stale' : ''}`
+                                }
+                            >
+                                {Array.from({ length: 16 }, (_, index) => (
+                                    <span
+                                        key={index}
+                                        className={`uc-meter-seg ${index < Math.ceil((percent / 100) * 16) ? 'uc-meter-seg-on' : ''}`}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                        <div
+                            className="uc-data uc-muted uc-ellipsis"
+                            title={tile.note}
+                        >
+                            {tile.note}
+                        </div>
+                    </div>
+                );
+            })}
+        </section>
+    );
+}
+function DeviceSummary({
+    device,
+    defaults,
+}: {
+    device: Device;
+    defaults: CloudSettings;
+}) {
+    const health = deviceHealth(
+        device.metrics,
+        device.status === 'offline',
+        device.health_warnings,
+    );
+    const autoSync = device.config.auto_sync ?? defaults.auto_pull;
+    const interval =
+        device.config.auto_sync == null
+            ? defaults.pull_interval
+            : device.config.interval;
+    const connection = `${device.config.user}@${device.config.host}:${device.config.port}`;
+    const items = [
+        {
+            label: 'Health',
+            value: health.label,
+            title: health.summary,
+            accent: !health.stale && !health.attention && health.hasMetrics,
+        },
+        {
+            label: 'Snapshot',
+            value: device.snapshot ? 'Open' : 'Closed',
+            title: device.snapshot
+                ? `Open · lease expires ${new Date(device.snapshot.expires_at * 1000).toLocaleTimeString()}`
+                : `Closed · ${device.config.snapshot_timeout} s idle limit`,
+        },
+        {
+            label: 'Auto sync',
+            value: autoSync
+                ? interval === 60
+                    ? 'Every minute'
+                    : `Every ${interval % 60 === 0 ? `${interval / 60} min` : `${interval} s`}`
+                : 'Paused',
+            title: nextSync(device, defaults),
+        },
+        {
+            label: 'Last sync',
+            value: ago(device.last_sync),
+            title: date(device.last_sync),
+        },
+        { label: 'Connection', value: connection, title: connection },
+    ];
+
+    return (
+        <section className="uc-device-status" aria-label="Device status">
+            <div className="uc-device-identity">
+                <span className="uc-data uc-accent">{device.id}</span>
+                <Badge status={device.status} />
+            </div>
+            <dl>
+                {items.map((item) => (
+                    <div key={item.label}>
+                        <dt className="uc-label uc-muted">{item.label}</dt>
+                        <dd
+                            className={`uc-data uc-ellipsis ${item.accent ? 'uc-accent' : item.label === 'Health' && health.stale ? 'uc-muted' : ''}`}
+                            title={item.title}
+                        >
+                            {item.value}
+                        </dd>
+                    </div>
+                ))}
+            </dl>
+        </section>
+    );
+}
+function LogPane({
+    entries,
+    title,
+    overview = false,
+    actions,
+}: {
+    entries: LogEntry[];
+    title: string;
+    overview?: boolean;
+    actions?: ReactNode;
+}) {
     const [follow, setFollow] = useState(true);
     const [wrap, setWrap] = useState(true);
     const body = useRef<HTMLDivElement>(null);
@@ -349,13 +574,24 @@ function LogPane({ entries, title }: { entries: LogEntry[]; title: string }) {
         return () => observer.disconnect();
     }, [follow, wrap, last?.at, last?.message, entries.length]);
     return (
-        <section className={`uc-log ${wrap ? '' : 'uc-log-no-wrap'}`}>
+        <section
+            className={`uc-log ${wrap ? '' : 'uc-log-no-wrap'} ${overview ? 'uc-log-overview' : ''}`}
+        >
             <header className="uc-log-head">
-                <span className="uc-label">{title}</span>
+                <div className="uc-inline">
+                    <span className="uc-label">{title}</span>
+                    {overview && (
+                        <span className="uc-label uc-log-count">
+                            {entries.length} entries
+                        </span>
+                    )}
+                </div>
                 <div className="uc-inline uc-log-controls">
-                    <span className="uc-label uc-log-count">
-                        {entries.length} entries
-                    </span>
+                    {!overview && (
+                        <span className="uc-label uc-log-count">
+                            {entries.length} entries
+                        </span>
+                    )}
                     <label className="uc-label uc-inline">
                         <input
                             type="checkbox"
@@ -374,6 +610,7 @@ function LogPane({ entries, title }: { entries: LogEntry[]; title: string }) {
                         />
                         Follow
                     </label>
+                    {actions}
                 </div>
             </header>
             <div
@@ -447,6 +684,8 @@ type DeviceConfig = {
     retry_delay: number;
 };
 type Transfer = {
+    token?: string;
+    started_at?: string;
     state: string;
     stage: string;
     current_file: string | null;
@@ -1138,6 +1377,13 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
         name: '',
     });
     const [addError, setAddError] = useState('');
+    const [storageSize, setStorageSize] = useState('');
+    const [installerProfile, setInstallerProfile] = useState(
+        cloud.server.installer_profiles[0]?.id ?? '',
+    );
+    const selectedInstallerProfile = cloud.server.installer_profiles.find(
+        (profile) => profile.id === installerProfile,
+    );
     const [existingClient, setExistingClient] = useState(false);
     const [installation, setInstallation] = useState<{
         command: string;
@@ -1147,8 +1393,17 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
     useEffect(() => {
         setInstallation(null);
         setCopyMessage('');
-    }, [addForm, existingClient, addOpen]);
-    const [dismissed, setDismissed] = useState('');
+    }, [addForm, storageSize, installerProfile, existingClient, addOpen]);
+    const [dismissedTransfers, setDismissedTransfers] =
+        useState<TransferDismissals>(() => {
+            try {
+                return parseTransferDismissals(
+                    localStorage.getItem(transferDismissalsKey),
+                );
+            } catch {
+                return {};
+            }
+        });
     const [logRows, setLogRows] = useState<LogRowState[]>([
         { id: 'row-0', panes: [{ id: 'pane-0', source: 'server' }] },
     ]);
@@ -1244,12 +1499,20 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
         (n, d) => n + (d.transfer?.total_bytes ?? 0),
         0,
     );
-    const allTransfers = cloud.devices.filter((d) => d.transfer);
-    const transferKey = allTransfers
-        .map((d) => `${d.id}:${d.transfer?.state}:${d.transfer?.total_bytes}`)
-        .join('|');
-    const transferVisible =
-        allTransfers.length > 0 && dismissed !== transferKey;
+    const allTransfers = visibleTransferDevices(
+        cloud.devices,
+        dismissedTransfers,
+    );
+    const transferVisible = allTransfers.length > 0;
+    function dismissFinishedTransfers() {
+        const next = dismissTransferRuns(allTransfers, dismissedTransfers);
+        setDismissedTransfers(next);
+        try {
+            localStorage.setItem(transferDismissalsKey, JSON.stringify(next));
+        } catch {
+            // Keep dismissal working in this page when browser storage is unavailable.
+        }
+    }
     const hasRunning = inflight.some((d) => isActive(d.transfer));
     const hasPaused = inflight.some((d) => d.transfer?.state === 'paused');
     const downloadable = selectedFiles.filter((id) =>
@@ -1279,7 +1542,6 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
             for (const device of id?.split('|') ?? [undefined]) {
                 await json(transfer.url(), 'POST', { action, device });
             }
-            setDismissed('');
             notify(
                 action === 'start'
                     ? 'Pull queued. Progress appears below.'
@@ -1711,10 +1973,14 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
         rows: StoredFile[],
         caption: string,
         selectable = false,
+        compact = false,
     ) {
-        const hasDuration = rows.some((file) => file.media?.duration != null);
+        const hasDuration =
+            !compact && rows.some((file) => file.media?.duration != null);
         return (
-            <div className="uc-table-wrap">
+            <div
+                className={`uc-table-wrap ${compact ? 'uc-recent-files' : ''}`}
+            >
                 <table className="uc-table uc-data">
                     <caption className="uc-label">{caption}</caption>
                     <thead>
@@ -1836,7 +2102,11 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                     className="uc-right uc-muted"
                                     title={date(f.modified_at)}
                                 >
-                                    {date(f.modified_at)}
+                                    {compact && f.modified_at
+                                        ? new Date(
+                                              f.modified_at,
+                                          ).toLocaleDateString('en-CA')
+                                        : date(f.modified_at)}
                                 </td>
                                 <td>
                                     <span
@@ -1866,8 +2136,9 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                     }
                                     className="uc-table-empty"
                                 >
-                                    0 files match. Pull from a device or adjust
-                                    the filters.
+                                    {compact
+                                        ? 'No files pulled from this device yet.'
+                                        : '0 files match. Pull from a device or adjust the filters.'}
                                 </td>
                             </tr>
                         )}
@@ -2228,10 +2499,7 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                             </Button>
                         )}
                         {!hasRunning && !hasPaused && (
-                            <Button
-                                small
-                                onClick={() => setDismissed(transferKey)}
-                            >
+                            <Button small onClick={dismissFinishedTransfers}>
                                 <Check size={14} />
                                 Dismiss
                             </Button>
@@ -2985,297 +3253,374 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                         </div>
                     )}
                     {screen === 'device' && active && (
-                        <div className="uc-page">
+                        <div
+                            className={`uc-page ${deviceTab === 'overview' ? 'uc-device-page' : ''}`}
+                        >
                             {deviceTab === 'overview' && (
-                                <>
-                                    <section className="uc-detail-card uc-device-summary">
-                                        <div className="uc-inline">
-                                            <Badge status={active.status} />
-                                            <span className="uc-data">
-                                                {active.snapshot
-                                                    ? 'Snapshot open'
-                                                    : 'Snapshot closed'}
-                                            </span>
-                                        </div>
-                                        <span className="uc-data uc-muted">
-                                            Auto sync:{' '}
-                                            {(active.config.auto_sync ??
-                                            cloud.settings.auto_pull)
-                                                ? `every ${active.config.auto_sync == null ? cloud.settings.pull_interval : active.config.interval} s`
-                                                : 'Paused'}{' '}
-                                            · Last sync {ago(active.last_sync)}
-                                        </span>
-                                    </section>
-                                    <div className="uc-fleet-layout">
-                                        <div className="uc-stack">
-                                            <section className="uc-detail-card">
-                                                <h2 className="uc-heading">
-                                                    Storage
+                                <div className="uc-device-overview">
+                                    <DeviceSummary
+                                        device={active}
+                                        defaults={cloud.settings}
+                                    />
+                                    <HealthTiles device={active} />
+                                    <div className="uc-device-panels">
+                                        <section className="uc-detail-card uc-drive-panel">
+                                            <div className="uc-panel-heading">
+                                                <h2 className="uc-label uc-muted">
+                                                    Drive
                                                 </h2>
-                                                <Meter device={active} />
+                                                <span
+                                                    className="uc-label uc-muted uc-ellipsis"
+                                                    title={
+                                                        active.filesystem?.mount
+                                                    }
+                                                >
+                                                    {active.filesystem?.mount ??
+                                                        'Not scanned'}
+                                                </span>
+                                            </div>
+                                            <Meter
+                                                device={active}
+                                                label="Used"
+                                            />
+                                            <Details
+                                                items={[
+                                                    [
+                                                        'Free',
+                                                        bytes(
+                                                            active.filesystem
+                                                                ?.free_bytes,
+                                                        ),
+                                                    ],
+                                                    [
+                                                        'Filesystem',
+                                                        active.filesystem?.type,
+                                                    ],
+                                                    [
+                                                        'USB state',
+                                                        active.usb_state ||
+                                                            'Unknown',
+                                                    ],
+                                                    [
+                                                        'Last file',
+                                                        <span
+                                                            className="uc-ellipsis"
+                                                            title={
+                                                                active.last_file ??
+                                                                undefined
+                                                            }
+                                                        >
+                                                            {active.last_file ??
+                                                                '—'}
+                                                        </span>,
+                                                    ],
+                                                ]}
+                                            />
+                                        </section>
+                                        <section
+                                            className="uc-detail-card uc-volume-panel"
+                                            aria-label="Device volumes"
+                                        >
+                                            <div className="uc-panel-heading">
+                                                <h2 className="uc-label uc-muted">
+                                                    Volumes
+                                                </h2>
+                                                <span className="uc-label uc-muted">
+                                                    {active.volumes?.length
+                                                        ? `${active.volumes.length} ${active.volumes.length === 1 ? 'volume' : 'volumes'}`
+                                                        : 'None yet'}
+                                                </span>
+                                            </div>
+                                            {active.volumes?.length ? (
+                                                active.volumes.map((volume) => (
+                                                    <div
+                                                        key={volume.id}
+                                                        className="uc-volume-row"
+                                                    >
+                                                        <div className="uc-volume-info">
+                                                            <span
+                                                                className="uc-data uc-volume-name"
+                                                                title={
+                                                                    volume.label ??
+                                                                    volume.id
+                                                                }
+                                                            >
+                                                                {volume.label
+                                                                    ? `${volume.id} · ${volume.label}`
+                                                                    : volume.id}
+                                                            </span>
+                                                            <span
+                                                                className="uc-data uc-muted uc-ellipsis"
+                                                                title={`${volume.type ?? 'Unknown'} · ${bytes(volume.total_bytes)}`}
+                                                            >
+                                                                {volume.type ??
+                                                                    'Unknown'}{' '}
+                                                                ·{' '}
+                                                                {bytes(
+                                                                    volume.total_bytes,
+                                                                )}
+                                                            </span>
+                                                        </div>
+                                                        <span
+                                                            className={`uc-label uc-volume-readable ${volume.mounted ? 'uc-accent' : 'uc-inverse'}`}
+                                                        >
+                                                            {volume.mounted
+                                                                ? 'Readable'
+                                                                : 'Not readable'}
+                                                        </span>
+                                                        {volume.error && (
+                                                            <div className="uc-volume-error uc-data">
+                                                                <ErrorSummary
+                                                                    message={
+                                                                        volume.error
+                                                                    }
+                                                                    theme={
+                                                                        theme
+                                                                    }
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <p className="uc-data uc-muted uc-volume-empty">
+                                                    No volume details reported.
+                                                    Volumes appear after a
+                                                    snapshot with an updated
+                                                    client; pull now or wait for
+                                                    the next sync.
+                                                </p>
+                                            )}
+                                            {active.volume_changes?.map(
+                                                (change) => (
+                                                    <p
+                                                        key={`${change.volume_id}-${change.kind}`}
+                                                        className="uc-data uc-muted"
+                                                    >
+                                                        {change.volume_id} ·{' '}
+                                                        {change.kind ===
+                                                        'reformatted'
+                                                            ? 'Reformatted or replaced since the previous scan'
+                                                            : change.kind ===
+                                                                'removed'
+                                                              ? 'Removed since the previous scan'
+                                                              : 'New volume detected'}
+                                                    </p>
+                                                ),
+                                            )}
+                                            <p
+                                                className="uc-data uc-muted uc-volume-scan"
+                                                title={date(active.scanned_at)}
+                                            >
+                                                {active.scanned_at
+                                                    ? `Last scanned ${ago(active.scanned_at)} · readability reflects that scan.`
+                                                    : 'Never scanned.'}
+                                            </p>
+                                        </section>
+                                        {active.transfer &&
+                                        !['completed', 'cancelled'].includes(
+                                            active.transfer.state,
+                                        ) ? (
+                                            <TransferPanel
+                                                device={active}
+                                                theme={theme}
+                                                onControl={(action, id) =>
+                                                    void control(action, id)
+                                                }
+                                                disabled={!!working}
+                                            />
+                                        ) : (
+                                            <section className="uc-detail-card">
+                                                <h2 className="uc-label uc-muted">
+                                                    Transfer
+                                                </h2>
+                                                <p className="uc-data">
+                                                    {active.status === 'offline'
+                                                        ? 'Unreachable'
+                                                        : active.status ===
+                                                            'fault'
+                                                          ? 'Blocked'
+                                                          : 'Idle'}{' '}
+                                                    ·{' '}
+                                                    {active.pending == null
+                                                        ? 'inventory not yet scanned'
+                                                        : active.pending > 0
+                                                          ? `${active.pending} new files waiting for the next sync`
+                                                          : `nothing new since ${ago(active.last_sync)}`}
+                                                    .
+                                                </p>
                                                 <Details
                                                     items={[
                                                         [
-                                                            'Free',
-                                                            bytes(
-                                                                active
-                                                                    .filesystem
-                                                                    ?.free_bytes,
+                                                            'Next sync',
+                                                            nextSync(
+                                                                active,
+                                                                cloud.settings,
                                                             ),
-                                                        ],
-                                                        [
-                                                            'Filesystem',
-                                                            active.filesystem
-                                                                ?.type,
-                                                        ],
-                                                        [
-                                                            'Mount',
-                                                            active.filesystem
-                                                                ?.mount,
                                                         ],
                                                         [
                                                             'Pending',
-                                                            active.pending,
+                                                            active.pending ==
+                                                            null
+                                                                ? 'Not scanned'
+                                                                : `${active.pending} files`,
                                                         ],
                                                         [
-                                                            'Last file',
-                                                            active.last_file,
-                                                        ],
-                                                    ]}
-                                                />
-                                            </section>
-                                            <section
-                                                className="uc-detail-card"
-                                                aria-label="Device volumes"
-                                            >
-                                                <h2 className="uc-heading">
-                                                    Volumes
-                                                </h2>
-                                                <p className="uc-data uc-muted">
-                                                    Last scanned{' '}
-                                                    {active.scanned_at
-                                                        ? date(
-                                                              active.scanned_at,
-                                                          )
-                                                        : 'never'}
-                                                    . Readability reflects that
-                                                    scan.
-                                                </p>
-                                                {volumeDetails(active)}
-                                            </section>
-                                            {active.transfer &&
-                                            ![
-                                                'completed',
-                                                'cancelled',
-                                            ].includes(
-                                                active.transfer.state,
-                                            ) ? (
-                                                <TransferPanel
-                                                    device={active}
-                                                    theme={theme}
-                                                    onControl={(a, id) =>
-                                                        void control(a, id)
-                                                    }
-                                                    disabled={!!working}
-                                                />
-                                            ) : (
-                                                <section className="uc-detail-card">
-                                                    <h2 className="uc-label uc-muted">
-                                                        Transfer
-                                                    </h2>
-                                                    <p className="uc-data">
-                                                        Idle ·{' '}
-                                                        {active.pending == null
-                                                            ? 'inventory not yet scanned'
-                                                            : `${active.pending} files waiting for the next pull`}
-                                                        .
-                                                    </p>
-                                                    <Details
-                                                        items={[
-                                                            [
-                                                                'Next sync',
-                                                                nextSync(
-                                                                    active,
-                                                                    cloud.settings,
-                                                                ),
-                                                            ],
-                                                            [
-                                                                'Bandwidth',
-                                                                active.config
-                                                                    .bandwidth
-                                                                    ? `${active.config.bandwidth} MB/s`
-                                                                    : 'Unlimited',
-                                                            ],
-                                                            [
-                                                                'Retries',
-                                                                `${active.config.retry_count} × ${active.config.retry_delay} s`,
-                                                            ],
-                                                        ]}
-                                                    />
-                                                </section>
-                                            )}
-                                            {fileTable(
-                                                cloud.files
-                                                    .filter(
-                                                        (f) =>
-                                                            f.device ===
-                                                            active.id,
-                                                    )
-                                                    .slice(0, 6),
-                                                'Recent files',
-                                            )}
-                                        </div>
-                                        <aside className="uc-details">
-                                            <section className="uc-detail-card">
-                                                <h2 className="uc-label uc-muted">
-                                                    Connection
-                                                </h2>
-                                                <Details
-                                                    items={[
-                                                        [
-                                                            'Host',
-                                                            active.config.host,
-                                                        ],
-                                                        [
-                                                            'SSH',
-                                                            `${active.config.user} · port ${active.config.port}`,
-                                                        ],
-                                                        ['Model', active.model],
-                                                        [
-                                                            'Firmware',
-                                                            active.firmware,
-                                                        ],
-                                                        [
-                                                            'Uptime',
-                                                            uptime(
-                                                                active.uptime_seconds,
-                                                            ),
-                                                        ],
-                                                        [
-                                                            'Site',
+                                                            'Bandwidth',
                                                             active.config
-                                                                .site || '—',
+                                                                .bandwidth
+                                                                ? `${active.config.bandwidth} MB/s`
+                                                                : 'Unlimited',
                                                         ],
                                                         [
-                                                            'USB state',
-                                                            active.usb_state,
+                                                            'Retries',
+                                                            `${active.config.retry_count} × ${active.config.retry_delay} s`,
+                                                        ],
+                                                        [
+                                                            'Snapshot',
+                                                            `${active.config.snapshot_timeout % 60 === 0 ? `${active.config.snapshot_timeout / 60} min` : `${active.config.snapshot_timeout} s`} idle limit`,
                                                         ],
                                                     ]}
                                                 />
-                                                <h2 className="uc-label uc-muted">
-                                                    Device health
-                                                </h2>
-                                                <Details
-                                                    items={[
-                                                        [
-                                                            'Status source',
-                                                            active.status_source ===
-                                                            'heartbeat'
-                                                                ? 'API heartbeat · every 30 s'
-                                                                : 'SSH · client upgrade needed',
-                                                        ],
-                                                        [
-                                                            'Last report',
-                                                            active.checked_at
-                                                                ? date(
-                                                                      active.checked_at,
-                                                                  )
-                                                                : 'Waiting for first heartbeat',
-                                                        ],
-                                                        [
-                                                            'Health',
-                                                            active.status ===
-                                                            'offline'
-                                                                ? 'Offline · metrics may be stale'
-                                                                : active
-                                                                        .health_warnings
-                                                                        .length
-                                                                  ? active.health_warnings.join(
-                                                                        ' · ',
-                                                                    )
-                                                                  : active.metrics
-                                                                    ? 'Healthy'
-                                                                    : 'Awaiting metrics',
-                                                        ],
-                                                        [
-                                                            'CPU temperature',
-                                                            active.metrics
-                                                                ?.cpu_temperature_c !=
-                                                            null
-                                                                ? `${active.metrics.cpu_temperature_c.toFixed(1)} °C`
-                                                                : '—',
-                                                        ],
-                                                        [
-                                                            'CPU load (1 min)',
-                                                            active.metrics
-                                                                ?.load_1m !=
-                                                            null
-                                                                ? `${active.metrics.load_1m.toFixed(2)} / ${active.metrics.cpu_count ?? '?'} cores`
-                                                                : '—',
-                                                        ],
-                                                        [
-                                                            'Memory used',
-                                                            active.metrics
-                                                                ?.memory_used_percent !=
-                                                            null
-                                                                ? `${active.metrics.memory_used_percent}%`
-                                                                : '—',
-                                                        ],
-                                                        [
-                                                            'System disk used',
-                                                            active.metrics
-                                                                ?.root_used_percent !=
-                                                            null
-                                                                ? `${active.metrics.root_used_percent}%`
-                                                                : '—',
-                                                        ],
-                                                        [
-                                                            'System disk free',
-                                                            active.metrics
-                                                                ?.root_free_bytes !=
-                                                            null
-                                                                ? bytes(
-                                                                      active
-                                                                          .metrics
-                                                                          .root_free_bytes,
-                                                                  )
-                                                                : '—',
-                                                        ],
-                                                        [
-                                                            'Power / thermal flags',
-                                                            active.metrics
-                                                                ?.throttled_flags !=
-                                                            null
-                                                                ? `0x${active.metrics.throttled_flags.toString(16)}`
-                                                                : '—',
-                                                        ],
-                                                    ]}
-                                                />
-                                                <div className="uc-card-actions">
-                                                    <Button
-                                                        small
-                                                        onClick={() =>
-                                                            setDeviceTab(
-                                                                'settings',
-                                                            )
-                                                        }
-                                                    >
-                                                        <Settings2 size={14} />
-                                                        Settings
-                                                    </Button>
-                                                </div>
                                             </section>
-                                            <LogPane
-                                                title={`${active.id} · client`}
-                                                entries={
-                                                    cloud.logs.devices[
-                                                        active.id
-                                                    ] ?? []
-                                                }
-                                            />
-                                        </aside>
+                                        )}
                                     </div>
-                                </>
+                                    <div className="uc-device-secondary">
+                                        <section className="uc-detail-card">
+                                            <div className="uc-panel-heading">
+                                                <h2 className="uc-label uc-muted">
+                                                    Client
+                                                </h2>
+                                                <span
+                                                    className="uc-label uc-muted uc-ellipsis"
+                                                    title={date(
+                                                        active.checked_at,
+                                                    )}
+                                                >
+                                                    {active.checked_at
+                                                        ? `${active.status === 'offline' ? 'Last report' : 'Reported'} ${ago(active.checked_at)}`
+                                                        : 'Awaiting report'}
+                                                </span>
+                                            </div>
+                                            <Details
+                                                items={[
+                                                    [
+                                                        'Host',
+                                                        <span
+                                                            className="uc-ellipsis"
+                                                            title={
+                                                                active.hostname ??
+                                                                active.config
+                                                                    .host
+                                                            }
+                                                        >
+                                                            {active.hostname ??
+                                                                active.config
+                                                                    .host}
+                                                        </span>,
+                                                    ],
+                                                    ['Address', active.address],
+                                                    [
+                                                        'SSH',
+                                                        `port ${active.config.port} · user ${active.config.user}`,
+                                                    ],
+                                                    ['Model', active.model],
+                                                    [
+                                                        'Agent',
+                                                        active.firmware
+                                                            ? `USBCloud agent ${active.firmware}`
+                                                            : '—',
+                                                    ],
+                                                    [
+                                                        'Uptime',
+                                                        uptime(
+                                                            active.uptime_seconds,
+                                                        ),
+                                                    ],
+                                                    [
+                                                        'Site',
+                                                        active.config.site ||
+                                                            '—',
+                                                    ],
+                                                    [
+                                                        'Reports via',
+                                                        active.status_source ===
+                                                        'heartbeat'
+                                                            ? 'API heartbeat · every 30 s'
+                                                            : 'SSH · client upgrade needed',
+                                                    ],
+                                                    [
+                                                        'Last report',
+                                                        active.checked_at ? (
+                                                            <span
+                                                                title={date(
+                                                                    active.checked_at,
+                                                                )}
+                                                            >
+                                                                {ago(
+                                                                    active.checked_at,
+                                                                )}
+                                                            </span>
+                                                        ) : (
+                                                            'Waiting for first heartbeat'
+                                                        ),
+                                                    ],
+                                                ]}
+                                            />
+                                            <div className="uc-card-actions">
+                                                <Button
+                                                    small
+                                                    variant="ghost"
+                                                    onClick={() =>
+                                                        setDeviceTab('settings')
+                                                    }
+                                                >
+                                                    <Settings2 size={14} />
+                                                    Settings
+                                                </Button>
+                                            </div>
+                                        </section>
+                                        {fileTable(
+                                            cloud.files
+                                                .filter(
+                                                    (file) =>
+                                                        file.device ===
+                                                        active.id,
+                                                )
+                                                .slice(0, 6),
+                                            `Recent files · ${active.id}`,
+                                            false,
+                                            true,
+                                        )}
+                                    </div>
+                                    {cloud.logs.errors[active.id] && (
+                                        <p className="uc-data" role="alert">
+                                            Log stream unavailable:{' '}
+                                            {cloud.logs.errors[active.id]}.
+                                            Retrying automatically.
+                                        </p>
+                                    )}
+                                    <LogPane
+                                        key={active.id}
+                                        overview
+                                        title={`${active.id} · client log`}
+                                        entries={
+                                            cloud.logs.devices[active.id] ?? []
+                                        }
+                                        actions={
+                                            <Button
+                                                small
+                                                variant="ghost"
+                                                onClick={() =>
+                                                    setDeviceTab('log')
+                                                }
+                                            >
+                                                <Terminal size={14} />
+                                                Full log
+                                            </Button>
+                                        }
+                                    />
+                                </div>
                             )}
                             {deviceTab === 'files' &&
                                 fileTable(
@@ -4093,7 +4438,18 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                                     }>(
                                                         createInstallation.url(),
                                                         'POST',
-                                                        addForm,
+                                                        {
+                                                            ...addForm,
+                                                            installer_profile:
+                                                                installerProfile,
+                                                            storage_size_gib:
+                                                                storageSize ===
+                                                                ''
+                                                                    ? null
+                                                                    : Number(
+                                                                          storageSize,
+                                                                      ),
+                                                        },
                                                     ),
                                                 );
                                                 setCopyMessage('');
@@ -4149,6 +4505,27 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                 />{' '}
                                 Client is already installed
                             </label>
+                            {!existingClient && (
+                                <div className="uc-stack">
+                                    <MultiSelect
+                                        label="Device profile"
+                                        multiple={false}
+                                        values={[installerProfile]}
+                                        options={cloud.server.installer_profiles.map(
+                                            (profile) => [
+                                                profile.id,
+                                                profile.name,
+                                            ],
+                                        )}
+                                        onChange={([value]) =>
+                                            setInstallerProfile(value)
+                                        }
+                                    />
+                                    <p className="uc-input-hint" role="status">
+                                        {selectedInstallerProfile?.description}
+                                    </p>
+                                </div>
+                            )}
                             <div className="uc-two-fields">
                                 <Field label="Hostname or IP">
                                     <div className="uc-field">
@@ -4214,6 +4591,28 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                     </div>
                                 </Field>
                             </div>
+                            {!existingClient && (
+                                <Field
+                                    label="USB storage size (GiB, optional)"
+                                    hint="Leave blank to choose on the Pi. The installer checks free space and reserves room for snapshots and the operating system."
+                                >
+                                    <div className="uc-field">
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            max={65536}
+                                            step={1}
+                                            value={storageSize}
+                                            placeholder="Choose during installation"
+                                            onChange={(event) =>
+                                                setStorageSize(
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </div>
+                                </Field>
+                            )}
                             <p className="uc-input-hint">
                                 {existingClient
                                     ? 'Use this for a configured client with SSH access and a trusted host key already on the server.'

@@ -2062,3 +2062,274 @@
     word-break: normal;
     overflow-wrap: normal;
 }
+
+.uc-device-page {
+    padding-top: 20px;
+}
+.uc-device-overview {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    min-width: 0;
+}
+.uc-ellipsis {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.uc-device-status {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    padding: var(--space-3) 0;
+    border: 1px solid var(--line);
+    background: var(--surface-raised);
+}
+.uc-device-identity {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: 0 20px 0 var(--space-4);
+}
+.uc-device-identity > .uc-data,
+.uc-volume-name {
+    font-weight: 600;
+    letter-spacing: 0.04em;
+}
+.uc-device-status dl {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(0, 2fr);
+    margin: 0;
+}
+.uc-device-status dl > div {
+    min-width: 0;
+    padding: 0 var(--space-4);
+    border-left: 1px solid var(--line);
+}
+.uc-device-status dd {
+    margin: 0;
+}
+.uc-health-tiles {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: var(--space-3);
+}
+.uc-health-tile {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    padding: var(--space-3) 14px;
+    border: 1px solid var(--line);
+    background: var(--surface-raised);
+}
+.uc-panel-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: var(--space-2);
+    min-width: 0;
+}
+.uc-panel-heading h2 {
+    flex-shrink: 0;
+    margin: 0;
+}
+.uc-health-value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 20px;
+    line-height: 26px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+.uc-health-flag {
+    padding: 0 var(--space-1);
+    white-space: nowrap;
+}
+.uc-health-high {
+    border-color: var(--inverse);
+}
+.uc-health-high .uc-meter-seg-on {
+    background: var(--inverse);
+}
+.uc-health-stale .uc-health-value {
+    color: var(--ink-muted);
+}
+.uc-health-stale .uc-health-flag {
+    color: var(--ink-faint);
+}
+.uc-health-stale .uc-meter-seg-on {
+    background: var(--ink-faint);
+}
+.uc-device-panels {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--space-4);
+}
+.uc-device-secondary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    align-items: start;
+    gap: var(--space-4);
+}
+.uc-recent-files .uc-table {
+    table-layout: fixed;
+    min-width: 560px;
+}
+.uc-recent-files th:first-child {
+    width: 36%;
+}
+.uc-recent-files th:nth-child(2) {
+    width: 18%;
+}
+.uc-recent-files th:nth-child(3) {
+    width: 12%;
+}
+.uc-recent-files th:nth-child(4) {
+    width: 20%;
+}
+.uc-recent-files td,
+.uc-recent-files .uc-file-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.uc-recent-files .uc-file-name {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+}
+.uc-device-overview .uc-detail-card {
+    min-width: 0;
+}
+.uc-device-overview .uc-detail-card p {
+    margin: 0;
+}
+.uc-device-overview .uc-detail-list {
+    gap: var(--space-1);
+}
+.uc-device-overview .uc-detail-list > div {
+    grid-template-columns: 96px minmax(0, 1fr);
+}
+.uc-device-overview .uc-card-actions {
+    justify-content: flex-end;
+    padding-top: var(--space-3);
+    border-top: 1px solid var(--line);
+}
+.uc-volume-panel {
+    gap: var(--space-2);
+}
+.uc-volume-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-2) 0;
+    border-top: 1px solid var(--line);
+}
+.uc-volume-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1 1 100px;
+}
+.uc-volume-name {
+    overflow-wrap: anywhere;
+}
+.uc-volume-readable {
+    padding: 0 var(--space-1);
+    white-space: nowrap;
+}
+.uc-volume-error {
+    flex-basis: 100%;
+    min-width: 0;
+}
+.uc-device-overview .uc-volume-scan {
+    margin-top: auto;
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--line);
+}
+.uc-volume-empty {
+    padding: var(--space-3);
+    border: 1px dashed var(--line-strong);
+}
+.uc-log-overview {
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
+    resize: none;
+    gap: var(--space-2);
+    border: 0;
+    background: transparent;
+}
+.uc-log-overview .uc-log-head {
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+.uc-log-overview .uc-log-body {
+    flex: none;
+    height: 240px;
+    border: 1px solid var(--line-strong);
+    background: var(--surface-sunken);
+}
+.uc-log-overview .uc-log-controls {
+    gap: var(--space-4);
+}
+
+@media (max-width: 1200px) {
+    .uc-device-status {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--space-3);
+    }
+    .uc-device-status dl > div:first-child {
+        border-left: 0;
+    }
+    .uc-device-secondary {
+        grid-template-columns: minmax(280px, 1fr) minmax(0, 2fr);
+    }
+}
+@media (max-width: 1000px) {
+    .uc-health-tiles {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .uc-device-panels {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        align-items: start;
+    }
+    .uc-device-panels > :last-child {
+        grid-column: 1 / -1;
+    }
+    .uc-device-secondary {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+@media (max-width: 600px) {
+    .uc-device-status dl {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--space-3) 0;
+    }
+    .uc-device-status dl > div:nth-child(odd) {
+        border-left: 0;
+    }
+    .uc-device-status dl > div:last-child {
+        grid-column: 1 / -1;
+    }
+    .uc-health-tiles {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .uc-health-tile:last-child {
+        grid-column: 1 / -1;
+    }
+    .uc-device-panels {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .uc-device-identity {
+        flex-wrap: wrap;
+    }
+}

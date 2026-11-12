@@ -30,7 +30,7 @@ class ExportUsbFiles extends Command
             }
             try {
                 $object = $client->filePath($file['run'] ?? '', $file);
-                if ($object !== null && $exports->save($client->directory(), $object, $file) !== null) {
+                if ($object !== null && $exports->save($client->archiveDirectory(), $object, $file) !== null) {
                     $count++;
                 }
             } catch (Throwable $exception) {

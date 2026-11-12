@@ -17,6 +17,38 @@ import urllib.request
 import usbcloud_client
 
 CLIENT = '/usr/local/sbin/usbcloud-client'
+PROFILES_PATH = Path(__file__).with_name('installer_profiles.json')
+
+
+def installer_profiles():
+    return json.loads(PROFILES_PATH.read_text())
+
+
+def select_profile(model, profile_id=None, update=False):
+    profiles = installer_profiles()
+    if profile_id is not None and profile_id not in profiles:
+        raise ValueError(f'Unknown installer profile: {profile_id}')
+    model = model.strip('\x00\n ')
+    matches = [key for key, profile in profiles.items() if re.fullmatch(profile['model_pattern'], model)]
+    if not matches:
+        raise RuntimeError(f'No supported installer profile for this board: {model}')
+    if profile_id is None:
+        if update:
+            profile_id = matches[0]
+        else:
+            if not sys.stdin.isatty():
+                raise RuntimeError('Select a device profile in Add device or supply --profile in the installation command.')
+            print(f'Detected board: {model}')
+            for key, profile in profiles.items():
+                print(f"  {key}: {profile['name']}")
+            while profile_id not in profiles:
+                profile_id = input(f'Device profile [{matches[0]}]: ').strip() or matches[0]
+                if profile_id not in profiles:
+                    print('Enter one of the profile IDs above.')
+    profile = profiles[profile_id]
+    if profile_id not in matches:
+        raise RuntimeError(f"The selected profile ({profile['name']}) does not match the detected board ({model}).")
+    return dict(profile, id=profile_id)
 
 
 def run(*args, **kwargs):
@@ -54,16 +86,18 @@ def write(path, content, mode=0o644):
             temporary.unlink(missing_ok=True)
 
 
-def configure_boot(path):
+def configure_boot(path, profile=None):
+    profile = profile or installer_profiles()['pi-zero-2-w']
     original = path.read_text()
-    lines = original.splitlines()
+    managed = re.sub(r'^# USBCloud USB device mode\n.*?^# End USBCloud USB device mode\n?', '', original, flags=re.MULTILINE | re.DOTALL)
+    lines = managed.splitlines()
     # Keep conditional sections and other settings; one unconditional overlay wins.
     lines = [line for line in lines if not re.match(r'^\s*dtoverlay\s*=\s*dwc2(?:,|\s|$)', line)
              and line != '# USBCloud USB device mode']
     updated = '\n'.join(lines).rstrip() + '\n'
     if not updated.endswith('[all]\n'):
         updated += '\n[all]\n'
-    updated += '# USBCloud USB device mode\ndtoverlay=dwc2,dr_mode=peripheral\n'
+    updated += '# USBCloud USB device mode\n' + '\n'.join(profile['boot_config']) + '\n# End USBCloud USB device mode\n'
     if updated == original:
         return False
     backup = path.with_name(path.name + '.usbcloud-backup')
@@ -161,7 +195,32 @@ WantedBy=timers.target
     run('systemctl', 'enable', '--now', 'usbcloud-client-expire.timer', 'avahi-daemon', 'ssh')
 
 
-def initialize_storage():
+def select_storage_size(size_gib=None):
+    path = usbcloud_client.BASE if usbcloud_client.BASE.exists() else usbcloud_client.BASE.parent
+    maximum = usbcloud_client.maximum_storage_size_gib(path)
+    if maximum < 1:
+        raise RuntimeError('Not enough free space for USB storage, snapshots and the operating system. At least 10 GiB free is required.')
+    if size_gib is not None:
+        usbcloud_client.storage_pool_size_gib(size_gib)
+        if size_gib > maximum:
+            raise RuntimeError(f'Maximum USB storage size is {maximum} GiB after reserving snapshot and system space.')
+        return size_gib
+    if not sys.stdin.isatty():
+        raise RuntimeError('Choose a storage size in Add device or supply --size-gib, or rerun this command in an interactive terminal.')
+    print('Choose the capacity presented over USB. Snapshot and system space are reserved separately.')
+    while True:
+        answer = input(f'USB storage size in GiB (1–{maximum}) [{maximum}]: ').strip()
+        try:
+            selected = maximum if not answer else int(answer)
+            usbcloud_client.storage_pool_size_gib(selected)
+            if selected <= maximum:
+                return selected
+        except ValueError:
+            pass
+        print(f'Enter a whole number from 1 to {maximum}.')
+
+
+def initialize_storage(size_gib=None):
     if usbcloud_client.POOL.exists():
         # Validate our backing volume, not the filesystem chosen by the USB host.
         usbcloud_client.attach_pool()
@@ -169,19 +228,23 @@ def initialize_storage():
         print('Preserving existing USB storage and recordings.')
         return
     usbcloud_client.BASE.mkdir(parents=True, mode=0o700, exist_ok=True)
-    run(CLIENT, 'init')
+    run(CLIENT, 'init', '--size-gib', str(size_gib))
 
 
-def install(backend=None, token=None, update=False):
+def install(backend=None, token=None, update=False, size_gib=None, profile_id=None):
     if os.geteuid() != 0:
         raise RuntimeError('Run the installer with sudo.')
     model = Path('/proc/device-tree/model')
-    if not model.exists() or 'Raspberry Pi Zero 2 W' not in model.read_text():
-        raise RuntimeError('This installer supports Raspberry Pi Zero 2 W running Raspberry Pi OS Lite.')
+    if not model.exists():
+        raise RuntimeError('No supported Raspberry Pi board was detected.')
+    configuration = None if update else api(backend, token, 'configuration')
+    saved_profile = usbcloud_client.read_json(usbcloud_client.BASE / 'installer.json') if update else None
+    detected_model = model.read_text().strip('\x00\n ')
+    profile = select_profile(detected_model, profile_id or (configuration or saved_profile or {}).get('installer_profile'), update=update)
+    print(f"Verified {detected_model} against profile {profile['name']}.", flush=True)
     boot = next((path for path in (Path('/boot/firmware/config.txt'), Path('/boot/config.txt')) if path.exists()), None)
     if boot is None or not shutil.which('apt-get') or not shutil.which('systemctl'):
         raise RuntimeError('Raspberry Pi OS with apt and systemd is required.')
-    configuration = None if update else api(backend, token, 'configuration')
     if configuration:
         user = configuration['user']
         if not re.fullmatch(r'[a-z_][a-z0-9_-]{0,31}', user, re.IGNORECASE) or user == 'root':
@@ -192,18 +255,20 @@ def install(backend=None, token=None, update=False):
             raise RuntimeError('Automatic installation currently requires SSH port 22.')
     elif not usbcloud_client.POOL.exists():
         raise RuntimeError('No existing installation. Use the command from Add device.')
-    if not usbcloud_client.POOL.exists() and shutil.disk_usage('/var/lib').free < 24 * 1024**3:
-        raise RuntimeError('At least 24 GiB free is required. Use a 64 GB or larger SD card.')
+    if not usbcloud_client.POOL.exists():
+        size_gib = select_storage_size(size_gib if size_gib is not None else configuration.get('storage_size_gib'))
     print('Installing system dependencies…', flush=True)
     run('apt-get', 'update')
     run('apt-get', 'install', '-y', 'lvm2', 'exfatprogs', 'fdisk', 'avahi-daemon', 'sudo', 'openssh-server', 'ca-certificates')
     run('install', '-o', 'root', '-g', 'root', '-m', '0755', str(Path(__file__).with_name('usbcloud_client.py')), CLIENT)
-    changed = configure_boot(boot)
-    write('/etc/modules-load.d/usbcloud-client.conf', 'dwc2\n')
+    print(f"Installing profile: {profile['name']}. {profile['description']}", flush=True)
+    changed = configure_boot(boot, profile)
+    write('/etc/modules-load.d/usbcloud-client.conf', '\n'.join(profile['modules']) + '\n')
     if configuration:
         authorize_backend(account, key)
         configure_sudo(user)
-    initialize_storage()
+    initialize_storage(size_gib)
+    write(usbcloud_client.BASE / 'installer.json', json.dumps({'installer_profile': profile['id']}), 0o600)
     install_services()
     if configuration:
         run('ssh-keygen', '-A')
@@ -216,10 +281,12 @@ def install(backend=None, token=None, update=False):
     controllers = list(Path('/sys/class/udc').glob('*'))
     if changed or not controllers:
         print('Setup complete. A reboot is required before connecting the USB data cable.')
+        print(profile['description'])
         return True
     else:
         run('systemctl', 'start', 'usbcloud-client.service')
         print('Setup complete. USB storage is ready; connect the USB data cable.')
+        print(profile['description'])
         return False
 
 
@@ -228,17 +295,19 @@ def main():
     parser.add_argument('--backend')
     parser.add_argument('--token')
     parser.add_argument('--update', action='store_true')
+    parser.add_argument('--size-gib', type=int, help='USB storage capacity in GiB; asks during a fresh install if omitted')
+    parser.add_argument('--profile', choices=list(installer_profiles()), help='Target device profile; asks during a fresh install if omitted')
     args = parser.parse_args()
     if not args.update and (not args.backend or not args.token):
         parser.error('Use the installation command from Add device.')
     try:
-        reboot_required = install(args.backend, args.token, args.update)
+        reboot_required = install(args.backend, args.token, args.update, args.size_gib, args.profile)
         if reboot_required:
             if sys.stdin.isatty() and input('Reboot now? [Y/n] ').strip().lower() in ('', 'y', 'yes'):
                 run('systemctl', 'reboot')
             else:
                 print('Run sudo reboot when ready. USB storage starts automatically after reboot.')
-    except (OSError, ValueError, KeyError, RuntimeError, subprocess.CalledProcessError) as error:
+    except (EOFError, OSError, ValueError, KeyError, RuntimeError, subprocess.CalledProcessError) as error:
         print(f'Installation stopped: {error}', file=sys.stderr)
         return 1
     return 0

@@ -2,7 +2,9 @@
 
 use App\Services\UsbCloud;
 use App\Services\UsbCloudClient;
+use App\Services\UsbCloudDevices;
 use App\Services\UsbCloudExports;
+use App\Services\UsbCloudTransfers;
 use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
@@ -179,4 +181,76 @@ it('refuses corrupt objects and unsafe export names without publishing files', f
     $entry['source_path'] = '../../outside.mp4';
     expect(fn () => $exports->save($directory, $object, $entry))->toThrow(RuntimeException::class, 'Unsafe');
     expect(File::exists($directory.'/exports'))->toBeFalse();
+});
+
+it('keeps scans and transfer progress in app settings without publishing pending clips', function () {
+    $archive = dirname(config('usbcloud.directory')).'/archive';
+    config(['usbcloud.archive_directory' => $archive, 'usbcloud.include_default_device' => false]);
+    $connection = app(UsbCloudDevices::class)->save('GARAGE', ['host' => 'garage.local']);
+    fakeVolumeClient(volumeManifest());
+    $client = new UsbCloudClient($connection);
+
+    $result = $client->retrieve(copy: false);
+    app(UsbCloudTransfers::class)->update('GARAGE', ['state' => 'queued']);
+
+    expect($result['success'])->toBeTrue();
+    expect(File::isFile(config('usbcloud.directory').'/devices/GARAGE/inventory.json'))->toBeTrue();
+    expect(File::isFile(config('usbcloud.directory').'/devices/GARAGE/'.$result['id'].'/result.json'))->toBeTrue();
+    expect(File::isFile(config('usbcloud.directory').'/devices/GARAGE/transfer.json'))->toBeTrue();
+    expect(File::isDirectory($archive) ? File::allFiles($archive) : [])->toBe([]);
+    Process::assertNotRan(fn (PendingProcess $process): bool => str_contains(end($process->command), 'snapshot-read'));
+});
+
+it('stores verified recordings and their source metadata in media clips and downloads from there', function () {
+    $archive = dirname(config('usbcloud.directory')).'/archive';
+    config(['usbcloud.archive_directory' => $archive, 'usbcloud.include_default_device' => false]);
+    $connection = app(UsbCloudDevices::class)->save('GARAGE', ['host' => 'garage.local']);
+    fakeVolumeClient(volumeManifest());
+    $client = new UsbCloudClient($connection);
+
+    $result = $client->retrieve();
+
+    expect($result['success'])->toBeTrue();
+    expect(File::glob($archive.'/devices/GARAGE/exports/2026/11/11/*/DCIM/clip.mp4'))->toHaveCount(2);
+    $metadata = File::glob($archive.'/devices/GARAGE/metadata/*.json');
+    expect($metadata)->toHaveCount(2);
+    expect(json_decode(File::get($metadata[0]), true))->toHaveKeys(['name', 'source_path', 'volume_id', 'volume_generation', 'sha256', 'bytes', 'modified_at']);
+    expect(File::isDirectory(config('usbcloud.directory').'/devices/GARAGE/objects'))->toBeFalse();
+    $file = app(UsbCloud::class)->allFiles()[0];
+    $this->get(route('usbcloud.file', $file['id']))->assertOk()->assertDownload('clip.mp4');
+    expect(File::isFile($archive.'/devices/GARAGE/media/'.$file['sha256'].'.json'))->toBeTrue();
+    expect($client->retrieve()['already_saved'])->toBe(2);
+    $this->artisan('usbcloud:export')->expectsOutput('2 readable files exported.')->assertSuccessful();
+    Process::assertRanTimes(fn (PendingProcess $process): bool => str_contains(end($process->command), 'snapshot-read'), 1);
+});
+
+it('leaves failed downloads out of media clips', function () {
+    $archive = dirname(config('usbcloud.directory')).'/archive';
+    config(['usbcloud.archive_directory' => $archive, 'usbcloud.include_default_device' => false]);
+    $connection = app(UsbCloudDevices::class)->save('GARAGE', ['host' => 'garage.local']);
+    fakeVolumeClient(volumeManifest(), 'bad');
+    $client = new UsbCloudClient($connection);
+
+    $result = $client->retrieve();
+
+    expect($result['success'])->toBeFalse();
+    expect($result['error'])->toContain('checksum');
+    expect(File::allFiles($archive))->toBe([]);
+    expect(File::isFile($client->directory().'/'.$result['id'].'/result.json'))->toBeTrue();
+    expect(File::exists($client->directory().'/'.$result['id'].'/files'))->toBeFalse();
+    Process::assertRan(fn (PendingProcess $process): bool => str_contains(end($process->command), 'snapshot-read'));
+});
+
+it('also stores client console recordings in the configured media folder', function () {
+    $archive = dirname(config('usbcloud.directory')).'/archive';
+    config(['usbcloud.archive_directory' => $archive]);
+    fakeVolumeClient(volumeManifest());
+
+    $response = $this->post(route('client.console.retrieve'))->assertOk();
+    expect($response->streamedContent())->toContain('"success":true');
+
+    expect(File::glob($archive.'/devices/BLINK-PI/exports/2026/11/11/*/DCIM/clip.mp4'))->toHaveCount(2);
+    expect(File::glob(config('usbcloud-client.directory').'/*/result.json'))->toHaveCount(1);
+    expect(File::isDirectory(config('usbcloud-client.directory').'/objects'))->toBeFalse();
+    Process::assertRanTimes(fn (PendingProcess $process): bool => str_contains(end($process->command), 'snapshot-read'), 1);
 });

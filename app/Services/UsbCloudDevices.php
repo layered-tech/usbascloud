@@ -26,9 +26,12 @@ class UsbCloudDevices
                 'name' => $id, 'host' => '', 'port' => 22, 'user' => config('usbcloud-client.user'),
                 'site' => '', 'auto_sync' => null, 'interval' => 60, 'bandwidth' => 0,
                 'snapshot_timeout' => 600, 'retry_count' => 0, 'retry_delay' => 15,
-                'directory' => (config('usbcloud.archive_directory') ?: config('usbcloud.directory')).'/devices/'.$id,
+                'directory' => config('usbcloud.directory').'/devices/'.$id,
                 'removed' => false,
             ], $device);
+            if ($archive = config('usbcloud.archive_directory')) {
+                $device['archive_directory'] = rtrim($archive, '/').'/devices/'.$id;
+            }
             $device['site'] ??= '';
             $device['name'] = $device['name'] ?: $id;
         }

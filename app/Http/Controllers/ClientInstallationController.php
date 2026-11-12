@@ -12,7 +12,7 @@ class ClientInstallationController extends Controller
 {
     public function store(SaveUsbCloudDeviceRequest $request, ClientInstallations $installations): JsonResponse
     {
-        return response()->json($installations->create($request->safe()->only(['name', 'host', 'port', 'user'])), 201)->header('Cache-Control', 'no-store');
+        return response()->json($installations->create($request->safe()->only(['name', 'host', 'port', 'user', 'storage_size_gib', 'installer_profile'])), 201)->header('Cache-Control', 'no-store');
     }
 
     public function configuration(Request $request, ClientInstallations $installations): JsonResponse
@@ -31,7 +31,7 @@ class ClientInstallationController extends Controller
 
     public function asset(string $file): BinaryFileResponse
     {
-        abort_unless(in_array($file, ['install.sh', 'install_client.py', 'usbcloud_client.py'], true), 404);
+        abort_unless(in_array($file, ['install.sh', 'install_client.py', 'usbcloud_client.py', 'installer_profiles.json'], true), 404);
 
         return response()->file(base_path('client/'.$file), ['Content-Type' => 'text/plain', 'Cache-Control' => 'no-store']);
     }

@@ -590,6 +590,7 @@ it('starts with an empty fleet in containers and stores new device archives in t
     Process::fake();
     $this->get(route('home'))->assertInertia(fn (Assert $page) => $page->has('cloud.devices', 0)->where('cloud.server.storage_root', '/archive'));
     app(UsbCloudDevices::class)->save('GARAGE', ['host' => 'garage.local']);
-    expect(app(UsbCloudDevices::class)->all()['GARAGE']['directory'])->toBe('/archive/devices/GARAGE');
+    expect(app(UsbCloudDevices::class)->all()['GARAGE']['directory'])->toBe(config('usbcloud.directory').'/devices/GARAGE');
+    expect(app(UsbCloudDevices::class)->all()['GARAGE']['archive_directory'])->toBe('/archive/devices/GARAGE');
     Process::assertNothingRan();
 });

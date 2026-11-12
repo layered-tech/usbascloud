@@ -14,6 +14,32 @@ import usbcloud_client as client
 
 
 class VolumeTest(unittest.TestCase):
+    def test_creates_requested_drive_and_reserves_snapshot_and_system_space(self):
+        with tempfile.TemporaryDirectory() as folder:
+            base = Path(folder)
+            pool = base / 'pool.img'
+            def command(*args, **kwargs):
+                if args[0] == 'fallocate':
+                    pool.touch()
+                return SimpleNamespace(stdout='/dev/loop0')
+            with patch.object(client, 'BASE', base), patch.object(client, 'POOL', pool), patch('subprocess.run', return_value=SimpleNamespace(returncode=1)), patch('shutil.disk_usage', return_value=SimpleNamespace(free=112 * 1024**3)), patch.object(client, 'run', side_effect=command) as run:
+                client.initialize(48)
+                run.assert_any_call('fallocate', '-l', '100G', str(pool))
+                run.assert_any_call('lvcreate', '-L', '48G', '-n', 'drive', client.VG)
+                self.assertEqual(pool.stat().st_mode & 0o777, 0o600)
+                run.reset_mock()
+                with self.assertRaisesRegex(RuntimeError, 'Existing storage'):
+                    client.initialize(16)
+                run.assert_not_called()
+
+    def test_refuses_storage_sizes_that_exceed_available_space_before_allocating(self):
+        with tempfile.TemporaryDirectory() as folder:
+            base = Path(folder)
+            with patch.object(client, 'BASE', base), patch.object(client, 'POOL', base / 'pool.img'), patch('subprocess.run', return_value=SimpleNamespace(returncode=1)), patch('shutil.disk_usage', return_value=SimpleNamespace(free=103 * 1024**3)), patch.object(client, 'run') as run:
+                with self.assertRaisesRegex(RuntimeError, '47 GiB'):
+                    client.initialize(48)
+                run.assert_not_called()
+
     def test_discovers_all_data_partitions_with_non_default_sector_size(self):
         table = {'partitiontable': {'label': 'dos', 'sectorsize': 4096, 'partitions': [
             {'start': 1, 'size': 10, 'type': '7'},
@@ -52,6 +78,7 @@ class VolumeTest(unittest.TestCase):
                 root = Path(folder)
                 with patch.object(client, 'BASE', root), patch.object(client, 'LEASE', root / 'lease.json'), patch.object(client, 'SNAP', str(root / 'capture')), patch.object(client, 'EXPORT', root / 'export'), patch.object(client, 'attach_pool'), patch.object(client, 'release'), patch.object(client, 'snapshot_layout', return_value=[{'id': 'disk', 'offset': 0, 'size': 1024}]), patch.object(client, 'probe_filesystem', return_value={'TYPE': filesystem, 'UUID': '1234'}), patch.object(client, 'run') as command, contextlib.redirect_stdout(io.StringIO()):
                     client.open_snapshot()
+                command.assert_any_call('lvcreate', '--snapshot', '-l', '100%FREE', '-n', 'capture', client.ORIGIN)
                 command.assert_any_call('mount', '-t', driver, '-o', options, str(root / 'capture'), str(root / 'export/volumes/disk'), stderr=subprocess.PIPE)
 
     def test_reformat_detection_tracks_uuid_changes_but_not_volume_renames(self):

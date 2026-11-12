@@ -6,6 +6,7 @@ use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
+use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
     $directory = storage_path('framework/testing/install-'.Str::uuid());
@@ -23,14 +24,20 @@ function installationHostKey(string $byte = 'a'): string
     return 'ssh-ed25519 '.base64_encode(pack('N', 11).'ssh-ed25519'.pack('N', 32).str_repeat($byte, 32));
 }
 
-function installationToken(): string
+function installationToken(array $settings = []): string
 {
     File::ensureDirectoryExists(config('usbcloud.directory'));
     File::put(config('usbcloud-client.identity').'.pub', installationHostKey());
     $response = test()->postJson(route('usbcloud.installations.store'), [
         'name' => 'Garage', 'host' => 'pi.local', 'port' => 22, 'user' => 'chris',
         'known_hosts_file' => '/etc/passwd', 'identity' => '/private/key',
+        ...$settings,
     ])->assertCreated();
+    if (isset($settings['storage_size_gib'])) {
+        expect($response->json('command'))->toContain('--size-gib '.$settings['storage_size_gib']);
+    }
+    expect($response->json('command'))->toContain('--profile');
+    expect($response->json('command'))->toContain($settings['installer_profile'] ?? 'pi-zero-2-w');
     preg_match('/[a-zA-Z0-9]{64}/', $response->json('command'), $matches);
 
     return $matches[0];
@@ -43,8 +50,57 @@ it('provides setup configuration without creating a device or accepting connecti
         ->assertOk()->assertJsonPath('user', 'chris')->assertJsonPath('host', 'pi.local')
         ->assertJsonPath('public_key', installationHostKey())->assertJsonMissingPath('identity')
         ->assertJsonMissingPath('known_hosts_file');
+    $this->withToken($token)->postJson(route('client.installation.configuration'))->assertJsonPath('installer_profile', 'pi-zero-2-w');
     expect(app(UsbCloudDevices::class)->all())->toBeEmpty();
 });
+
+it('passes the optional storage size to the installer', function () {
+    $token = installationToken(['storage_size_gib' => 48]);
+
+    $this->withToken($token)->postJson(route('client.installation.configuration'))
+        ->assertOk()->assertJsonPath('storage_size_gib', 48);
+    expect(app(UsbCloudDevices::class)->all())->toBeEmpty();
+});
+
+it('provides the selected hardware profile in setup commands and configuration', function () {
+    $token = installationToken(['installer_profile' => 'pi-4-b']);
+
+    $this->withToken($token)->postJson(route('client.installation.configuration'))
+        ->assertOk()->assertJsonPath('installer_profile', 'pi-4-b');
+    expect(app(UsbCloudDevices::class)->all())->toBeEmpty();
+});
+
+it('offers the same installer profiles in the add device modal', function () {
+    Process::fake();
+
+    $this->get(route('home'))->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->has('cloud.server.installer_profiles', 2)
+        ->where('cloud.server.installer_profiles.0.id', 'pi-zero-2-w')
+        ->where('cloud.server.installer_profiles.1.id', 'pi-4-b')
+        ->where('cloud.server.installer_profiles.1.description', fn (string $description): bool => str_contains($description, 'USB-C')));
+    Process::assertNothingRan();
+});
+
+it('rejects unknown installer profiles with 422', function () {
+    $this->postJson(route('usbcloud.installations.store'), [
+        'name' => 'Pi', 'host' => 'pi.local', 'port' => 22, 'user' => 'pi', 'installer_profile' => 'pi-5',
+    ])->assertUnprocessable()->assertJsonValidationErrors('installer_profile');
+    expect(app(UsbCloudDevices::class)->all())->toBeEmpty();
+});
+
+it('leaves storage size unset when the Pi should ask during installation', function (array $settings) {
+    $token = installationToken($settings);
+
+    $this->withToken($token)->postJson(route('client.installation.configuration'))
+        ->assertOk()->assertJsonPath('storage_size_gib', null);
+})->with([[[]], [['storage_size_gib' => null]]]);
+
+it('rejects invalid installation storage sizes with 422', function (mixed $size) {
+    $this->postJson(route('usbcloud.installations.store'), [
+        'name' => 'Garage', 'host' => 'pi.local', 'port' => 22, 'user' => 'pi', 'storage_size_gib' => $size,
+    ])->assertUnprocessable()->assertJsonValidationErrors('storage_size_gib');
+    expect(app(UsbCloudDevices::class)->all())->toBeEmpty();
+})->with([0, -1, 1.5, '48G', 65537]);
 
 it('registers a pinned host key and accepts its first heartbeat without interactive SSH', function () {
     $token = installationToken();
@@ -125,8 +181,8 @@ it('validates setup inputs and reports a missing server identity before issuing 
     $this->postJson(route('usbcloud.installations.store'), ['host' => 'pi.local', 'port' => 2222, 'user' => 'pi', 'name' => 'Pi'])->assertUnprocessable();
 });
 
-it('serves only the three installation assets', function () {
-    foreach (['install.sh', 'install_client.py', 'usbcloud_client.py'] as $file) {
+it('serves only the installation assets', function () {
+    foreach (['install.sh', 'install_client.py', 'usbcloud_client.py', 'installer_profiles.json'] as $file) {
         $this->get(route('client.installation.asset', $file))->assertOk()->assertHeader('Content-Type', 'text/plain; charset=utf-8');
     }
     $this->get(route('client.installation.asset', '.env'))->assertNotFound();

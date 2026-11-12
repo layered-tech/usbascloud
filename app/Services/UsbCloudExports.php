@@ -12,9 +12,6 @@ class UsbCloudExports
     /** @param array<string, mixed> $entry */
     public function save(string $directory, string $object, array $entry): ?string
     {
-        if (! config('usbcloud.readable_exports')) {
-            return null;
-        }
         $digest = $entry['sha256'] ?? '';
         if (! is_string($digest) || ! preg_match('/\A[a-f0-9]{64}\z/', $digest) || ! $this->matches($object, $digest)) {
             throw new RuntimeException('Cannot export an unverified archive object.');
@@ -25,6 +22,10 @@ class UsbCloudExports
             if (in_array($part, ['', '.', '..'], true) || preg_match('/[\x00-\x1f\x7f\\\\]/', $part)) {
                 throw new RuntimeException('Unsafe readable export path.');
             }
+        }
+        $this->saveMetadata($directory, $entry);
+        if (! config('usbcloud.readable_exports')) {
+            return null;
         }
         $date = 'undated';
         try {
@@ -77,6 +78,18 @@ class UsbCloudExports
         }
 
         return $destination;
+    }
+
+    /** @param array<string, mixed> $entry */
+    public function saveMetadata(string $directory, array $entry): void
+    {
+        $parent = rtrim($directory, '/').'/metadata';
+        if (is_link($parent)) {
+            throw new RuntimeException('Clip metadata directory cannot be a symlink.');
+        }
+        File::ensureDirectoryExists($parent);
+        $key = hash('sha256', $entry['name']."\0".$entry['sha256']."\0".($entry['volume_generation'] ?? ''));
+        File::replace($parent.'/'.$key.'.json', json_encode($entry, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
     }
 
     private function matches(string $path, string $digest): bool

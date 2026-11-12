@@ -28,6 +28,9 @@ SNAP = f'/dev/{VG}/capture'
 EXPORT = Path('/srv/blink-poc/snapshot') if Path('/srv/blink-poc').exists() else Path('/srv/usbcloud-client/snapshot')
 LEASE = BASE / 'snapshot.json'
 VERSION = '0.5.0'
+GIB = 1024**3
+STORAGE_OVERHEAD_GIB = 4
+SYSTEM_RESERVE_GIB = 4
 
 
 def timestamp():
@@ -193,20 +196,33 @@ def attach_pool():
     return loop
 
 
-def initialize():
+def storage_pool_size_gib(size_gib):
+    if type(size_gib) is not int or not 1 <= size_gib <= 65536:
+        raise ValueError('USB storage size must be a whole number from 1 to 65536 GiB.')
+    return 2 * size_gib + STORAGE_OVERHEAD_GIB
+
+
+def maximum_storage_size_gib(path):
+    free_gib = shutil.disk_usage(path).free // GIB
+    return max(0, min(65536, (free_gib - STORAGE_OVERHEAD_GIB - SYSTEM_RESERVE_GIB) // 2))
+
+
+def initialize(size_gib=8):
     # Refuse to format anything that already exists; never use the SD partition.
     if POOL.exists() or subprocess.run(['vgs', VG], capture_output=True).returncode == 0:
         raise RuntimeError('Existing storage detected; refusing to initialize again')
-    if shutil.disk_usage(BASE).free < 24 * 1024**3:
-        raise RuntimeError('Need at least 24 GiB free')
-    run('fallocate', '-l', '20G', str(POOL))
+    pool_gib = storage_pool_size_gib(size_gib)
+    maximum = maximum_storage_size_gib(BASE)
+    if size_gib > maximum:
+        raise RuntimeError(f'Not enough free space. Maximum USB storage size is {maximum} GiB after reserving snapshot and system space.')
+    run('fallocate', '-l', f'{pool_gib}G', str(POOL))
     os.chmod(POOL, 0o600)
     loop = output('losetup', '--find', '--show', str(POOL))
     run('pvcreate', loop)
     run('vgcreate', VG, loop)
-    run('lvcreate', '-L', '8G', '-n', 'drive', VG)
+    run('lvcreate', '-L', f'{size_gib}G', '-n', 'drive', VG)
     run('mkfs.exfat', '-L', 'USBCLOUD', ORIGIN)
-    print('Created an 8 GiB exFAT disk inside the dedicated pool file.')
+    print(f'Created a {size_gib} GiB exFAT disk inside a {pool_gib} GiB pool with snapshot space reserved.')
 
 
 def start():
@@ -333,7 +349,7 @@ def open_snapshot(timeout=600):
     if Path(SNAP).exists() or LEASE.exists():
         raise RuntimeError('Snapshot already open; close it or wait for expiry')
     EXPORT.mkdir(parents=True, exist_ok=True, mode=0o755)
-    run('lvcreate', '--snapshot', '-L', '9G', '-n', 'capture', ORIGIN)
+    run('lvcreate', '--snapshot', '-l', '100%FREE', '-n', 'capture', ORIGIN)
     lease = {'token': secrets.token_hex(16), 'expires_at': time.time() + timeout,
              'path': str(EXPORT), 'loop': None, 'protocol': 2, 'volumes': []}
     write_json(LEASE, lease)
@@ -472,6 +488,7 @@ def main():
     parser.add_argument('--token')
     parser.add_argument('--path')
     parser.add_argument('--timeout', type=int, default=600)
+    parser.add_argument('--size-gib', type=int, default=8, help='USB drive size in GiB for init (default: 8)')
     args = parser.parse_args()
     if args.action == 'ssh-serve':
         serve_ssh()
@@ -499,7 +516,7 @@ def main():
     with (BASE / 'lock').open('w') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         if args.action == 'init':
-            initialize()
+            initialize(args.size_gib)
         elif args.action == 'start':
             start()
         elif args.action == 'detach':

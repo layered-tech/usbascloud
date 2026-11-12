@@ -107,7 +107,7 @@ class UsbCloudClient
             foreach ($inventory['volume_changes'] as $change) {
                 $run['log'][] = 'Volume '.$change['volume_id'].': '.$change['kind'].'.';
             }
-            $newFiles = array_filter($manifest['files'], fn (array $entry): bool => ! (File::isFile($this->directory().'/objects/'.$entry['sha256']) && File::size($this->directory().'/objects/'.$entry['sha256']) === $entry['bytes'] && hash_file('sha256', $this->directory().'/objects/'.$entry['sha256']) === $entry['sha256']));
+            $newFiles = array_filter($manifest['files'], fn (array $entry): bool => ! (File::isFile($this->archiveDirectory().'/objects/'.$entry['sha256']) && File::size($this->archiveDirectory().'/objects/'.$entry['sha256']) === $entry['bytes'] && hash_file('sha256', $this->archiveDirectory().'/objects/'.$entry['sha256']) === $entry['sha256']));
             $newFiles = array_column($newFiles, null, 'sha256');
             $recorded = [];
             foreach ($this->runs(null) as $savedRun) {
@@ -126,9 +126,9 @@ class UsbCloudClient
                     continue;
                 }
                 $digest = $entry['sha256'];
-                $destination = $this->directory().'/objects/'.$digest;
+                $destination = $this->archiveDirectory().'/objects/'.$digest;
                 if (File::isFile($destination) && File::size($destination) === $entry['bytes'] && hash_file('sha256', $destination) === $digest) {
-                    $entry['export_path'] = app(UsbCloudExports::class)->save($this->directory(), $destination, $entry);
+                    $entry['export_path'] = app(UsbCloudExports::class)->save($this->archiveDirectory(), $destination, $entry);
                     $key = $entry['name']."\0".$entry['sha256']."\0".($entry['volume_generation'] ?? '');
                     if (! isset($recorded[$key])) {
                         $run['reused_files'][] = [...$entry, 'id' => null];
@@ -167,7 +167,7 @@ class UsbCloudClient
                     ...array_intersect_key($entry, array_flip(['volume_id', 'volume_generation', 'source_path'])),
                     'video' => strtolower(pathinfo($entry['name'], PATHINFO_EXTENSION)) === 'mp4',
                 ];
-                $export = app(UsbCloudExports::class)->save($this->directory(), $destination, $entry);
+                $export = app(UsbCloudExports::class)->save($this->archiveDirectory(), $destination, $entry);
                 $run['files'][array_key_last($run['files'])]['export_path'] = $export;
             }
             $errors = array_filter(array_column($inventory['volumes'], 'error'));
@@ -318,7 +318,7 @@ class UsbCloudClient
     {
         $digest = $entry['sha256'] ?? '';
         if (is_string($digest) && preg_match('/\A[a-f0-9]{64}\z/', $digest)) {
-            $object = $this->directory().'/objects/'.$digest;
+            $object = $this->archiveDirectory().'/objects/'.$digest;
             if (is_file($object)) {
                 return $object;
             }
@@ -331,7 +331,7 @@ class UsbCloudClient
 
     private function consolidateLegacyFiles(): void
     {
-        File::ensureDirectoryExists($this->directory().'/objects');
+        File::ensureDirectoryExists($this->archiveDirectory().'/objects');
         foreach (File::glob($this->directory().'/*/result.json') as $manifest) {
             $result = json_decode(File::get($manifest), true, flags: JSON_THROW_ON_ERROR);
             foreach ($result['files'] as $entry) {
@@ -345,7 +345,7 @@ class UsbCloudClient
                 if ($digest !== $entry['sha256']) {
                     throw new RuntimeException('A saved file no longer matches its recorded checksum: '.$entry['name']);
                 }
-                $object = $this->directory().'/objects/'.$digest;
+                $object = $this->archiveDirectory().'/objects/'.$digest;
                 if (File::exists($object)) {
                     if (hash_file('sha256', $object) !== $digest) {
                         throw new RuntimeException('A saved object failed checksum verification.');
@@ -362,6 +362,13 @@ class UsbCloudClient
     public function directory(): string
     {
         return $this->connection['directory'] ?? (string) config('usbcloud-client.directory');
+    }
+
+    public function archiveDirectory(): string
+    {
+        return $this->connection['archive_directory'] ?? (config('usbcloud.archive_directory')
+            ? rtrim(config('usbcloud.archive_directory'), '/').'/devices/'.config('usbcloud.device_id')
+            : $this->directory());
     }
 
     /** @param array<string, string> $configuration */

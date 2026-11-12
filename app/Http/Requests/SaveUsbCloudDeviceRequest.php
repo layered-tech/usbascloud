@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Services\ClientInstallations;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class SaveUsbCloudDeviceRequest extends FormRequest
 {
@@ -25,6 +27,8 @@ class SaveUsbCloudDeviceRequest extends FormRequest
             'snapshot_timeout' => ['sometimes', 'integer', 'between:60,3600'],
             'retry_count' => ['sometimes', 'integer', 'between:0,10'],
             'retry_delay' => ['sometimes', 'integer', 'between:5,300'],
+            'storage_size_gib' => [$this->routeIs('usbcloud.installations.store') ? 'nullable' : 'exclude', 'integer', 'between:1,65536'],
+            'installer_profile' => [$this->routeIs('usbcloud.installations.store') ? 'sometimes' : 'exclude', 'required', 'string', Rule::in(array_column(app(ClientInstallations::class)->profiles(), 'id'))],
         ];
     }
 }

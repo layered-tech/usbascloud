@@ -1,0 +1,16 @@
+{
+    "pi-zero-2-w": {
+        "name": "Raspberry Pi Zero 2 W",
+        "description": "Raspberry Pi OS Lite. Connect the USB host to the micro-USB data port labelled USB; PWR IN is for power only.",
+        "model_pattern": "Raspberry Pi Zero 2 W(?: Rev [0-9.]+)?",
+        "boot_config": ["dtoverlay=dwc2,dr_mode=peripheral"],
+        "modules": ["dwc2"]
+    },
+    "pi-4-b": {
+        "name": "Raspberry Pi 4 Model B",
+        "description": "Raspberry Pi OS Lite. Connect the USB host to USB-C and provide separate power, for example PoE. USB-A ports cannot present storage. This profile has not been hardware-tested.",
+        "model_pattern": "Raspberry Pi 4 Model B(?: Rev [0-9.]+)?",
+        "boot_config": ["otg_mode=0", "dtoverlay=dwc2,dr_mode=peripheral"],
+        "modules": ["dwc2"]
+    }
+}

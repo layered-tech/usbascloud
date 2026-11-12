@@ -49,6 +49,7 @@ a { color: var(--phosphor); text-decoration: none; } a:hover { text-decoration: 
 .vf-galrow { flex-wrap: nowrap; }
 @media (max-width: 960px) { .vf-galpage { height: auto; } .vf-galrow { flex-wrap: wrap; } .vf-galrow > * { overflow-y: visible; max-height: none; } }
 .vf-ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vf-nowrap .uc-log-msg { white-space: pre; }
 * { scrollbar-width: thin; scrollbar-color: var(--line-strong) var(--surface-sunken); }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: var(--surface-sunken); }
@@ -234,47 +235,88 @@ a { color: var(--phosphor); text-decoration: none; } a:hover { text-decoration: 
       <x-import component-from-global-scope="USBCloud.Tabs" items="{{dev.tabs}}" active="{{dev.tab}}" on-change="{{dev.setTab}}"></x-import>
 
       <sc-if value="{{dev.isOverview}}" hint-placeholder-val="{{yes}}">
-        <div style="padding: 24px 32px 32px; display: flex; flex-direction: column; gap: 24px;">
+        <div style="padding: 20px 32px 32px; display: flex; flex-direction: column; gap: 16px;">
 
-          <div style="display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: center; padding: 16px; border: 1px solid var(--line); background: var(--surface-raised);">
-            <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="display: grid; grid-template-columns: max-content repeat(4, minmax(0, 1fr)) minmax(0, 2fr); align-items: center; padding: 12px 0; border: 1px solid var(--line); background: var(--surface-raised);">
+            <div style="display: flex; align-items: center; gap: 12px; padding: 0 20px 0 16px;">
               <span class="uc-data" style="font-weight: 600; letter-spacing: 0.04em; color: var(--phosphor);">{{dev.id}}</span>
               <x-import component-from-global-scope="USBCloud.StatusBadge" status="{{dev.badgeStatus}}">{{dev.badgeText}}</x-import>
             </div>
-            <div style="display: flex; flex-direction: column; gap: 0;">
+            <div style="display: flex; flex-direction: column; gap: 0; min-width: 0; padding: 0 16px; border-left: 1px solid var(--line);">
+              <span class="uc-label" style="color: var(--ink-muted);">Health</span>
+              <span class="uc-data vf-ellipsis" style="color: {{dev.healthColor}};" title="{{dev.healthText}}">{{dev.healthShort}}</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0; min-width: 0; padding: 0 16px; border-left: 1px solid var(--line);">
               <span class="uc-label" style="color: var(--ink-muted);">Snapshot</span>
-              <span class="uc-data" style="color: var(--ink);">{{dev.snapshotText}}</span>
+              <span class="uc-data vf-ellipsis" style="color: var(--ink);" title="{{dev.snapshotText}}">{{dev.snapshotShort}}</span>
             </div>
-            <div style="display: flex; flex-direction: column; gap: 0;">
+            <div style="display: flex; flex-direction: column; gap: 0; min-width: 0; padding: 0 16px; border-left: 1px solid var(--line);">
               <span class="uc-label" style="color: var(--ink-muted);">Auto sync</span>
-              <span class="uc-data" style="color: var(--ink);">{{dev.autoText}}</span>
+              <span class="uc-data vf-ellipsis" style="color: var(--ink);" title="{{dev.autoLine}}">{{dev.autoText}}</span>
             </div>
-            <div style="display: flex; flex-direction: column; gap: 0;">
+            <div style="display: flex; flex-direction: column; gap: 0; min-width: 0; padding: 0 16px; border-left: 1px solid var(--line);">
               <span class="uc-label" style="color: var(--ink-muted);">Last sync</span>
-              <span class="uc-data" style="color: var(--ink);">{{dev.lastSync}}</span>
+              <span class="uc-data vf-ellipsis" style="color: var(--ink);">{{dev.lastSync}}</span>
             </div>
-            <div style="display: flex; flex-direction: column; gap: 0;">
+            <div style="display: flex; flex-direction: column; gap: 0; min-width: 0; padding: 0 16px; border-left: 1px solid var(--line);">
               <span class="uc-label" style="color: var(--ink-muted);">Connection</span>
-              <span class="uc-data" style="color: var(--ink);">{{dev.connText}}</span>
+              <span class="uc-data vf-ellipsis" style="color: var(--ink);" title="{{dev.connText}}">{{dev.connText}}</span>
             </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px;">
+            <sc-for list="{{dev.tiles}}" as="t" hint-placeholder-count="5">
+              <div style="padding: 12px 14px; border: 1px solid {{t.border}}; background: var(--surface-raised); display: flex; flex-direction: column; gap: 6px; min-width: 0;">
+                <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
+                  <span class="uc-label" style="color: var(--ink-muted);">{{t.label}}</span>
+                  <span class="uc-label vf-ellipsis" style="color: {{t.flagColor}}; background: {{t.flagBg}}; padding: 0 4px;">{{t.flag}}</span>
+                </div>
+                <div class="vf-ellipsis" style="font-size: 20px; line-height: 26px; font-weight: 600; font-variant-numeric: tabular-nums; color: {{t.valueColor}};">{{t.value}}</div>
+                <sc-if value="{{t.hasMeter}}" hint-placeholder-val="{{yes}}">
+                  <x-import component-from-global-scope="USBCloud.Meter" value="{{t.meterValue}}" max="{{hundred}}" segments="{{t.segments}}" full-at="{{t.fullAt}}" label=""></x-import>
+                </sc-if>
+                <div class="uc-data vf-ellipsis" style="color: var(--ink-muted);" title="{{t.note}}">{{t.note}}</div>
+              </div>
+            </sc-for>
           </div>
 
           <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;">
             <section style="padding: 16px; border: 1px solid var(--line); background: var(--surface-raised); display: flex; flex-direction: column; gap: 12px;">
-              <div class="uc-label" style="color: var(--ink-muted);">Storage</div>
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
+                <div class="uc-label" style="color: var(--ink-muted);">Drive</div>
+                <div class="uc-label" style="color: var(--ink-muted);">{{dev.mount}}</div>
+              </div>
               <x-import component-from-global-scope="USBCloud.Meter" label="Used" value="{{dev.usedBytes}}" max="{{dev.totalBytes}}" live="{{dev.inProgress}}" value-text="{{dev.usedText}}" caption="{{dev.totalText}}"></x-import>
               <dl class="uc-data" style="margin: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 4px 12px;">
                 <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Free</dt>
                 <dd style="margin: 0; color: var(--ink);">{{dev.freeText}}</dd>
                 <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Filesystem</dt>
                 <dd style="margin: 0; color: var(--ink);">{{dev.fs}}</dd>
-                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Mount</dt>
-                <dd style="margin: 0; color: var(--ink);">{{dev.mount}}</dd>
-                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Pending</dt>
-                <dd style="margin: 0; color: var(--ink);">{{dev.pendingText}}</dd>
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">USB state</dt>
+                <dd style="margin: 0; color: var(--ink);">{{dev.usbState}}</dd>
                 <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Last file</dt>
                 <dd class="vf-ellipsis" style="margin: 0; color: var(--ink);" title="{{dev.lastFile}}">{{dev.lastFile}}</dd>
               </dl>
+            </section>
+
+            <section style="padding: 16px; border: 1px solid var(--line); background: var(--surface-raised); display: flex; flex-direction: column; gap: 8px;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
+                <div class="uc-label" style="color: var(--ink-muted);">Volumes</div>
+                <div class="uc-label" style="color: var(--ink-muted);">{{dev.volumesCount}}</div>
+              </div>
+              <sc-if value="{{dev.noVolumes}}" hint-placeholder-val="{{no}}">
+                <div class="uc-data" style="padding: 12px; border: 1px dashed var(--line-strong); color: var(--ink-muted);">{{dev.volumesHint}}</div>
+              </sc-if>
+              <sc-for list="{{dev.volumes}}" as="v" hint-placeholder-count="1">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line);">
+                  <div style="display: flex; flex-direction: column; gap: 0; min-width: 0;">
+                    <span class="uc-data" style="font-weight: 600; letter-spacing: 0.04em; color: var(--ink);">{{v.label}}</span>
+                    <span class="uc-data vf-ellipsis" style="color: var(--ink-muted);">{{v.meta}}</span>
+                  </div>
+                  <span class="uc-label" style="color: {{v.color}}; background: {{v.bg}}; padding: 0 4px; white-space: nowrap;">{{v.readText}}</span>
+                </div>
+              </sc-for>
+              <div class="uc-data" style="color: var(--ink-muted); margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line);">{{dev.volumesScanLine}}</div>
             </section>
 
             <sc-if value="{{dev.inProgress}}" hint-placeholder-val="{{yes}}">
@@ -310,16 +352,25 @@ a { color: var(--phosphor); text-decoration: none; } a:hover { text-decoration: 
                 <dl class="uc-data" style="margin: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 4px 12px;">
                   <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Next sync</dt>
                   <dd style="margin: 0; color: var(--ink);">{{dev.nextSyncText}}</dd>
+                  <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Pending</dt>
+                  <dd style="margin: 0; color: var(--ink);">{{dev.pendingText}}</dd>
                   <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Bandwidth</dt>
                   <dd style="margin: 0; color: var(--ink);">{{dev.bandwidthText}}</dd>
                   <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Retries</dt>
                   <dd style="margin: 0; color: var(--ink);">{{dev.retryText}}</dd>
+                  <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Snapshot</dt>
+                  <dd style="margin: 0; color: var(--ink);">{{dev.snapshotLimit}}</dd>
                 </dl>
               </section>
             </sc-if>
+          </div>
 
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 16px; align-items: start;">
             <section style="padding: 16px; border: 1px solid var(--line); background: var(--surface-raised); display: flex; flex-direction: column; gap: 12px;">
-              <div class="uc-label" style="color: var(--ink-muted);">Client</div>
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px;">
+                <div class="uc-label" style="color: var(--ink-muted);">Client</div>
+                <div class="uc-label" style="color: var(--ink-muted);">{{dev.reportLine}}</div>
+              </div>
               <dl class="uc-data" style="margin: 0; display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 4px 12px;">
                 <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Host</dt>
                 <dd class="vf-ellipsis" style="margin: 0; color: var(--ink);" title="{{dev.host}}">{{dev.host}}</dd>
@@ -335,18 +386,36 @@ a { color: var(--phosphor); text-decoration: none; } a:hover { text-decoration: 
                 <dd style="margin: 0; color: var(--ink);">{{dev.uptime}}</dd>
                 <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Site</dt>
                 <dd style="margin: 0; color: var(--ink);">{{dev.site}}</dd>
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Reports via</dt>
+                <dd style="margin: 0; color: var(--ink);">{{dev.statusSource}}</dd>
+                <dt class="uc-label" style="color: var(--ink-muted); line-height: 20px;">Last report</dt>
+                <dd style="margin: 0; color: var(--ink);">{{dev.lastReport}}</dd>
               </dl>
+              <div style="display: flex; justify-content: flex-end; padding-top: 12px; border-top: 1px solid var(--line);">
+                <x-import component-from-global-scope="USBCloud.Button" size="small" variant="ghost" icon="settings" on-click="{{dev.goSettings}}">Settings</x-import>
+              </div>
             </section>
+            <div style="min-width: 0; overflow-x: auto;">
+              <x-import component-from-global-scope="USBCloud.DataTable" caption="{{dev.recentCaption}}" columns="{{fileColumns}}" rows="{{dev.recentRows}}" row-key="path" on-select-row="{{dev.selectFile}}" empty-text="No files pulled from this device yet."></x-import>
+            </div>
           </div>
 
-          <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start;">
-            <div style="flex: 999 1 520px; min-width: 0; overflow-x: auto;">
-              <x-import component-from-global-scope="USBCloud.DataTable" caption="{{dev.recentCaption}}" columns="{{fileColumns}}" rows="{{dev.recentRows}}" row-key="path" on-select-row="{{dev.selectFile}}" empty-text="No files from this device yet."></x-import>
+          <section style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;">
+              <div style="display: flex; align-items: baseline; gap: 12px;">
+                <span class="uc-label" style="color: var(--ink-muted);">{{dev.logTitle}}</span>
+                <span class="uc-label" style="color: var(--ink-faint);">{{dev.logCount}}</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 16px;">
+                <label class="uc-label" style="display: flex; align-items: center; gap: 6px; color: var(--ink-muted); cursor: pointer;"><input type="checkbox" checked="{{dev.logWrap}}" onChange="{{dev.toggleWrap}}" style="accent-color: var(--phosphor); margin: 0;">Wrap</label>
+                <label class="uc-label" style="display: flex; align-items: center; gap: 6px; color: var(--ink-muted); cursor: pointer;"><input type="checkbox" checked="{{dev.logFollow}}" onChange="{{dev.toggleFollow}}" style="accent-color: var(--phosphor); margin: 0;">Follow</label>
+                <x-import component-from-global-scope="USBCloud.Button" size="small" variant="ghost" icon="terminal" on-click="{{dev.openLogTab}}">Full log</x-import>
+              </div>
             </div>
-            <div style="flex: 1 1 400px; min-width: 0;">
-              <x-import component-from-global-scope="USBCloud.LogPane" title="{{dev.logTitle}}" entries="{{dev.logEntries}}" height="{{dev.logHeightSmall}}" follow="{{yes}}" empty-text="0 entries today."></x-import>
+            <div class="{{dev.logClass}}">
+              <x-import component-from-global-scope="USBCloud.LogPane" entries="{{dev.logEntries}}" height="{{dev.logHeightSmall}}" follow="{{dev.logFollow}}" empty-text="0 entries today."></x-import>
             </div>
-          </div>
+          </section>
         </div>
       </sc-if>
 
@@ -952,19 +1021,19 @@ class Component extends DCLogic {
     return [
       { id: 'WAREHOUSE-07', name: 'Dock 3 scanner', site: 'Warehouse', status: 'online', usedBytes: 7.4e9, totalBytes: 32e9, lastSync: '29 s ago', pending: 0, mount: '/mnt/usb0', host: 'usbcloud-wh07.local', addr: '10.0.4.17', model: 'Raspberry Pi Zero 2 W', fw: '2.4.1', uptime: '11 d 04:12', fs: 'exFAT', lastFile: 'scan_20261106_1358.pdf' },
       { id: 'WAREHOUSE-02', name: 'Dock 1 scanner', site: 'Warehouse', status: 'online', usedBytes: 12.8e9, totalBytes: 32e9, lastSync: '4 min ago', pending: 3, pendingBytes: 1.2e6, mount: '/mnt/usb0', host: 'usbcloud-wh02.local', addr: '10.0.4.12', model: 'Raspberry Pi Zero 2 W', fw: '2.4.1', uptime: '11 d 04:09', fs: 'exFAT', lastFile: 'scan_20261106_1401.pdf' },
-      { id: 'FIELD-12', name: 'Van 12 logger', site: 'Vehicles', status: 'syncing', usedBytes: 19.1e9, totalBytes: 32e9, lastSync: 'just now', pending: 38, mount: '/mnt/usb0', host: 'usbcloud-van12.local', addr: '10.0.9.112', model: 'Raspberry Pi 4 B', fw: '2.4.0', uptime: '0 d 06:51', fs: 'ext4', lastFile: 'van12_20261106.csv', cfg: { interval: '300', bandwidth: '1' },
+      { id: 'FIELD-12', name: 'Van 12 logger', site: 'Vehicles', status: 'syncing', usedBytes: 19.1e9, totalBytes: 32e9, lastSync: 'just now', pending: 38, mount: '/mnt/usb0', host: 'usbcloud-van12.local', addr: '10.0.9.112', model: 'Raspberry Pi 4 B', fw: '2.4.0', uptime: '0 d 06:51', fs: 'ext4', lastFile: 'van12_20261106.csv', cfg: { interval: '300', bandwidth: '1' }, health: { temp: 58.4, load: 2.4, memPct: 62, diskPct: 44, diskFree: 16.2e9 },
         transfer: { total: 2.1e9, base: 1.28e9, rate: 0.55e6, files: 38, current: 'van12_20261106.csv', currentBytes: 58.2e6 } },
-      { id: 'FIELD-09', name: 'Van 9 logger', site: 'Vehicles', status: 'offline', usedBytes: 2.0e9, totalBytes: 16e9, lastSync: '4 h ago', pending: 4, mount: '/mnt/usb0', host: 'usbcloud-van09.local', addr: '10.0.9.109', model: 'Raspberry Pi 4 B', fw: '2.3.7', uptime: '0 d 00:00', fs: 'ext4', lastFile: 'van9_20261106.csv', cfg: { interval: '300', bandwidth: '1', retryCount: '5', retryDelay: '60' } },
-      { id: 'KIOSK-02', name: 'Lobby kiosk', site: 'Building', status: 'fault', fault: 'mount', usedBytes: 31.2e9, totalBytes: 32e9, lastSync: '2 d ago', pending: 112, mount: '/mnt/usb0', host: 'usbcloud-kiosk02.local', addr: '10.0.2.22', model: 'Raspberry Pi 3 B+', fw: '2.2.0', uptime: '41 d 19:03', fs: 'FAT32', lastFile: 'session_8812.json' },
+      { id: 'FIELD-09', name: 'Van 9 logger', site: 'Vehicles', status: 'offline', usedBytes: 2.0e9, totalBytes: 16e9, lastSync: '4 h ago', pending: 4, mount: '/mnt/usb0', host: 'usbcloud-van09.local', addr: '10.0.9.109', model: 'Raspberry Pi 4 B', fw: '2.3.7', uptime: '0 d 00:00', fs: 'ext4', lastFile: 'van9_20261106.csv', cfg: { interval: '300', bandwidth: '1', retryCount: '5', retryDelay: '60' }, health: { temp: 41.0, load: 0.4, memPct: 47, diskPct: 52, diskFree: 13.9e9 } },
+      { id: 'KIOSK-02', name: 'Lobby kiosk', site: 'Building', status: 'fault', fault: 'mount', usedBytes: 31.2e9, totalBytes: 32e9, lastSync: '2 d ago', pending: 112, mount: '/mnt/usb0', host: 'usbcloud-kiosk02.local', addr: '10.0.2.22', model: 'Raspberry Pi 3 B+', fw: '2.2.0', uptime: '41 d 19:03', fs: 'FAT32', lastFile: 'session_8812.json', health: { temp: 71.2, load: 3.6, memPct: 91, diskPct: 94, diskFree: 0.9e9, flags: 0x50005 } },
       { id: 'FIELD-03', name: 'Van 3 logger', site: 'Vehicles', status: 'online', usedBytes: 5.6e9, totalBytes: 16e9, lastSync: '12 min ago', pending: 0, mount: '/mnt/usb0', host: 'usbcloud-van03.local', addr: '10.0.9.103', model: 'Raspberry Pi 4 B', fw: '2.4.1', uptime: '2 d 01:40', fs: 'ext4', lastFile: 'van3_20261106.csv', cfg: { interval: '300', bandwidth: '1' } },
-      { id: 'LAB-01', name: 'Bench recorder', site: 'Building', status: 'online', usedBytes: 44.0e9, totalBytes: 128e9, lastSync: '45 s ago', pending: 6, pendingBytes: 212e6, mount: '/mnt/usb1', host: 'usbcloud-lab01.local', addr: '10.0.6.5', model: 'Raspberry Pi 4 B', fw: '2.4.1', uptime: '7 d 12:30', fs: 'ext4', lastFile: 'rec_1401.wav' },
+      { id: 'LAB-01', name: 'Bench recorder', site: 'Building', status: 'online', usedBytes: 44.0e9, totalBytes: 128e9, lastSync: '45 s ago', pending: 6, pendingBytes: 212e6, mount: '/mnt/usb1', host: 'usbcloud-lab01.local', addr: '10.0.6.5', model: 'Raspberry Pi 4 B', fw: '2.4.1', uptime: '7 d 12:30', fs: 'ext4', lastFile: 'rec_1401.wav', volumes: [{ label: 'usb0', fs: 'ext4', size: 64e9, readable: true }, { label: 'usb1', fs: 'ext4', size: 64e9, readable: true }] },
       { id: 'GATE-04', name: 'Gate camera store', site: 'Building', status: 'online', usedBytes: 88.3e9, totalBytes: 128e9, lastSync: '3 min ago', pending: 1, pendingBytes: 1.4e9, mount: '/mnt/usb0', host: 'usbcloud-gate04.local', addr: '10.0.3.44', model: 'Raspberry Pi 4 B', fw: '2.4.1', uptime: '19 d 08:15', fs: 'exFAT', lastFile: 'gate04_1359.mp4', cfg: { snapshotTimeout: '900' } },
       { id: 'YARD-11', name: 'Yard tablet', site: 'Warehouse', status: 'syncing', usedBytes: 9.7e9, totalBytes: 32e9, lastSync: 'just now', pending: 21, mount: '/mnt/usb0', host: 'usbcloud-yard11.local', addr: '10.0.5.111', model: 'Raspberry Pi Zero 2 W', fw: '2.4.0', uptime: '1 d 03:22', fs: 'ext4', lastFile: 'photo_0412.jpg',
         transfer: { total: 640e6, base: 140e6, rate: 0.4e6, files: 21, current: 'photo_0412.jpg', currentBytes: 3.1e6 } },
       { id: 'OFFICE-05', name: 'Front desk', site: 'Building', status: 'online', usedBytes: 1.2e9, totalBytes: 16e9, lastSync: '1 h ago', pending: 0, mount: '/mnt/usb0', host: 'usbcloud-office05.local', addr: '10.0.1.55', model: 'Raspberry Pi Zero 2 W', fw: '2.4.1', uptime: '30 d 00:48', fs: 'exFAT', lastFile: 'visitors_1215.csv', cfg: { interval: '3600' } },
       { id: 'PLANT-08', name: 'Line 8 PLC dump', site: 'Warehouse', status: 'online', usedBytes: 25.5e9, totalBytes: 64e9, lastSync: '2 min ago', pending: 2, pendingBytes: 48e6, mount: '/mnt/usb0', host: 'usbcloud-plant08.local', addr: '10.0.7.88', model: 'Raspberry Pi 4 B', fw: '2.4.1', uptime: '5 d 16:04', fs: 'ext4', lastFile: 'line8_dump_1400.bin' },
       { id: 'DEPOT-06', name: 'Depot scale', site: 'Warehouse', status: 'online', usedBytes: 0.8e9, totalBytes: 16e9, lastSync: '18 min ago', pending: 0, mount: '/mnt/usb0', host: 'usbcloud-depot06.local', addr: '10.0.8.66', model: 'Raspberry Pi Zero 2 W', fw: '2.3.9', uptime: '14 d 22:11', fs: 'FAT32', lastFile: 'weigh_1344.csv', cfg: { autoSync: false } },
-      { id: 'GARAGE-01', name: 'Garage Blink', site: 'Home', status: 'online', usedBytes: 18.4e9, totalBytes: 64e9, lastSync: '6 min ago', pending: 2, pendingBytes: 96e6, mount: '/mnt/usb0', host: 'usbcloud-garage.local', addr: '10.0.0.31', model: 'Raspberry Pi Zero 2 W', fw: '2.4.1', uptime: '3 d 09:18', fs: 'exFAT', lastFile: 'garage_20261106_1353.mp4', cfg: { interval: '60' } },
+      { id: 'GARAGE-01', name: 'Garage Blink', site: 'Home', status: 'online', usedBytes: 18.4e9, totalBytes: 64e9, lastSync: '6 min ago', pending: 2, pendingBytes: 96e6, mount: '/mnt/usb0', host: 'usbcloud-garage.local', addr: '10.0.0.31', model: 'Raspberry Pi Zero 2 W', fw: '2.4.1', uptime: '3 d 09:18', fs: 'exFAT', lastFile: 'garage_20261106_1353.mp4', cfg: { interval: '60' }, health: { temp: 44.2, load: 0.31, memPct: 38.5, diskPct: 21, diskFree: 92.6e9 } },
       { id: 'DRIVE-02', name: 'Driveway Blink', site: 'Home', status: 'online', usedBytes: 22.1e9, totalBytes: 64e9, lastSync: '1 min ago', pending: 0, mount: '/mnt/usb0', host: 'usbcloud-driveway.local', addr: '10.0.0.32', model: 'Raspberry Pi Zero 2 W', fw: '2.4.1', uptime: '3 d 09:15', fs: 'exFAT', lastFile: 'driveway_20261106_1400.mp4', cfg: { interval: '60' } }
     ];
   }
@@ -1029,6 +1098,30 @@ class Component extends DCLogic {
     return c;
   }
 
+  healthFor(d, live, tick) {
+    var h = d.health || {};
+    var seed = d.id.length + d.id.charCodeAt(0);
+    var memTotal = /Zero/.test(d.model) ? 512e6 : /3 B/.test(d.model) ? 1e9 : 4e9;
+    return {
+      temp: h.temp != null ? h.temp : 37 + (seed % 9) + 0.4,
+      load: h.load != null ? h.load : Math.round((0.08 + (seed % 5) * 0.09) * 100) / 100,
+      cores: 4, memTotal: memTotal,
+      memPct: h.memPct != null ? h.memPct : 28 + (seed % 23),
+      diskPct: h.diskPct != null ? h.diskPct : 17 + (seed % 19),
+      diskFree: h.diskFree != null ? h.diskFree : 20e9 + (seed % 7) * 2e9,
+      flags: h.flags || 0,
+      interval: 30,
+      stale: live.status === 'offline',
+      reportAgo: live.connecting ? 'waiting for first report' : live.status === 'offline' ? d.lastSync : live.status === 'fault' ? ((tick + seed) % 30) + ' s ago' : ((tick + seed) % 30) + ' s ago',
+      usbState: live.connecting ? 'not configured yet' : live.status === 'offline' ? 'unknown · last seen configured' : 'configured · mass storage'
+    };
+  }
+  decodeFlags(f) {
+    var now = [], past = [];
+    if (f & 0x1) now.push('under-voltage'); if (f & 0x2) now.push('frequency capped'); if (f & 0x4) now.push('throttled'); if (f & 0x8) now.push('soft temp limit');
+    if (f & 0x10000) past.push('under-voltage'); if (f & 0x20000) past.push('frequency capped'); if (f & 0x40000) past.push('throttled'); if (f & 0x80000) past.push('soft temp limit');
+    return { now: now, past: past };
+  }
   fmtGB(n) { return (n / 1e9).toFixed(1) + ' GB'; }
   fmtB(n) {
     if (n == null) return '—';
@@ -1656,7 +1749,46 @@ class Component extends DCLogic {
     var usedPct = Math.round(dd.usedBytes / dd.totalBytes * 100);
     var nextIn = dd.autoSync ? Number(saved.interval) - ((tick + 17) % Number(saved.interval)) : null;
     var snapshotText = dd.progress ? 'Open ' + self.fmtClock(dd.progress.openFor) + ' · closes after ' + labelOf(SNAPSHOTS, saved.snapshotTimeout) + ' idle' : dd.status === 'fault' ? 'Cannot open · drive busy' : dd.connecting ? 'Not yet opened' : 'Closed · limit ' + labelOf(SNAPSHOTS, saved.snapshotTimeout);
+    var H = self.healthFor(ddBase, dd, tick);
+    var fl = self.decodeFlags(H.flags);
+    var stale = H.stale;
+    var tileOf = function (label, value, pct, warn, note, flag, fullAt) {
+      var bad = warn && !stale;
+      return { label: label, value: value, valueColor: stale ? 'var(--ink-muted)' : 'var(--ink)', hasMeter: pct != null, meterValue: pct == null ? 0 : Math.max(0, Math.min(100, pct)), segments: 16, fullAt: fullAt == null ? 0.85 : fullAt,
+        note: note, flag: stale ? 'Stale' : flag || (bad ? 'High' : 'OK'), flagColor: stale ? 'var(--ink-faint)' : bad ? 'var(--on-inverse)' : 'var(--ink-muted)', flagBg: bad && !stale ? 'var(--inverse)' : 'transparent', border: bad ? 'var(--inverse)' : 'var(--line)' };
+    };
+    var loadPct = H.load / H.cores * 100;
+    var flagsNow = fl.now.length ? fl.now.join(' · ') : (fl.past.length ? 'OK · earlier ' + fl.past.join(', ') : 'No flags raised');
+    var healthText = dd.connecting ? 'Pairing' : stale ? 'Offline · metrics may be stale' : (fl.now.length || H.temp >= 70 || loadPct > 80 || H.memPct > 85 || H.diskPct > 85) ? 'Attention · ' + (fl.now.length ? fl.now[0] : H.temp >= 70 ? 'running hot' : loadPct > 80 ? 'CPU busy' : H.memPct > 85 ? 'memory high' : 'system disk nearly full') : 'Healthy · reporting every ' + H.interval + ' s';
+    var vols = ddBase.volumes || (ddBase.lastFile === '—' ? [] : [{ label: 'usb0', fs: ddBase.fs, size: ddBase.totalBytes, readable: ddBase.status !== 'fault' }]);
     var devVals = {
+      healthShort: dd.connecting ? 'Pairing' : stale ? 'Offline · stale' : healthText.indexOf('Attention') === 0 ? 'Attention' : 'Healthy',
+      snapshotShort: dd.progress ? 'Open ' + self.fmtClock(dd.progress.openFor) : dd.status === 'fault' ? 'Cannot open' : dd.connecting ? 'Not opened' : 'Closed',
+      healthText: healthText, healthColor: dd.connecting ? 'var(--ink)' : stale ? 'var(--ink-muted)' : healthText.indexOf('Attention') === 0 ? 'var(--ink)' : 'var(--phosphor)',
+      autoLine: dd.autoSync ? labelOf(INTERVALS, saved.interval) + (dd.progress ? ' · running' : ' · next ' + self.fmtEta(nextIn)) : 'Paused · manual only',
+      snapshotLimit: labelOf(SNAPSHOTS, saved.snapshotTimeout) + ' idle limit',
+      usbState: H.usbState,
+      statusSource: 'API heartbeat · every ' + H.interval + ' s',
+      lastReport: H.reportAgo,
+      reportLine: stale ? 'last report ' + H.reportAgo : 'reported ' + H.reportAgo,
+      tiles: [
+        tileOf('CPU temp', H.temp.toFixed(1) + ' °C', H.temp / 85 * 100, H.temp >= 70, 'throttles at 85 °C', H.temp >= 70 ? 'Hot' : null, 80 / 85),
+        tileOf('CPU load', H.load.toFixed(2), loadPct, loadPct > 80, '1 min average · ' + H.cores + ' cores', null),
+        tileOf('Memory', H.memPct.toFixed(1) + '%', H.memPct, H.memPct > 85, 'of ' + self.fmtB(H.memTotal) + ' used', null),
+        tileOf('System disk', H.diskPct + '%', H.diskPct, H.diskPct > 85, self.fmtB(H.diskFree) + ' free', H.diskPct > 85 ? 'Full' : null),
+        tileOf('Throttling', fl.now.length ? fl.now.length + (fl.now.length === 1 ? ' flag' : ' flags') : 'Clear', null, fl.now.length > 0, flagsNow, fl.now.length ? 'Active' : 'OK')
+      ],
+      volumes: vols.map(function (v) { return { label: v.label, meta: v.fs + ' · ' + self.fmtB(v.size), readText: v.readable ? 'Readable' : 'Not readable', color: v.readable ? 'var(--phosphor)' : 'var(--on-inverse)', bg: v.readable ? 'transparent' : 'var(--inverse)' }; }),
+      noVolumes: vols.length === 0, volumesCount: vols.length ? vols.length + (vols.length === 1 ? ' volume' : ' volumes') : 'none yet',
+      volumesHint: 'Not scanned yet. Volumes appear after the first snapshot; pull now or wait for the next sync.',
+      volumesScanLine: vols.length ? 'Last scanned ' + dd.lastSync + ' · readability reflects that scan.' : 'Never scanned.',
+      logCount: self.deviceLog(dd).length + ' entries',
+      logWrap: s.logWrap !== false, logFollow: s.logFollow !== false,
+      logClass: s.logWrap === false ? 'vf-nowrap' : '',
+      toggleWrap: function () { self.setState({ logWrap: s.logWrap === false }); },
+      toggleFollow: function () { self.setState({ logFollow: s.logFollow === false }); },
+      openLogTab: function () { self.setState({ deviceTab: 'log' }); },
+      goSettings: function () { self.setState({ deviceTab: 'settings' }); },
       id: dd.id, name: dd.name, crumbs: ['USBCloud', 'Fleet', dd.id],
       tabs: [{ id: 'overview', label: 'Overview' }, { id: 'files', label: 'Files', count: files.filter(function (f) { return f.device === dd.id; }).length }, { id: 'log', label: 'Log' }, { id: 'settings', label: 'Settings' }],
       tab: deviceTab, setTab: function (id) { self.setState({ deviceTab: id }); },
@@ -1686,7 +1818,7 @@ class Component extends DCLogic {
       allRows: files.filter(function (f) { return f.device === dd.id; }).sort(function (a, b) { return b.epoch - a.epoch; }),
       filesCaption: files.filter(function (f) { return f.device === dd.id; }).length + ' files from ' + dd.id,
       selectFile: function (r) { showFilesFor(dd.id, r.path); },
-      logTitle: dd.id + ' · log', logEntries: self.deviceLog(dd), logHeightSmall: 300, logHeightTall: 560,
+      logTitle: dd.id + ' · client log', logEntries: self.deviceLog(dd), logHeightSmall: 240, logHeightTall: 560,
       cfg: cfgVals,
       idLine: 'Device ID ' + dd.id + ' · assigned at pairing and used for the server folder /var/lib/usbcloud/store/' + dd.id,
       clean: !dirty, saveColor: savedRecently ? 'var(--phosphor)' : 'var(--ink-muted)',

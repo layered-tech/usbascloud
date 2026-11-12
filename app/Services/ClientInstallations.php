@@ -8,11 +8,26 @@ use Illuminate\Support\Str;
 
 class ClientInstallations
 {
+    /** @return list<array{id: string, name: string, description: string}> */
+    public function profiles(): array
+    {
+        $catalog = json_decode(File::get(base_path('client/installer_profiles.json')), true, flags: JSON_THROW_ON_ERROR);
+        $profiles = [];
+        foreach ($catalog as $id => $profile) {
+            $profiles[] = ['id' => $id, 'name' => $profile['name'], 'description' => $profile['description']];
+        }
+
+        return $profiles;
+    }
+
     /** @param array<string, mixed> $connection
      * @return array{command: string, expires_at: string}
      */
     public function create(array $connection): array
     {
+        $storageSize = isset($connection['storage_size_gib']) ? (int) $connection['storage_size_gib'] : null;
+        $profile = $connection['installer_profile'] ?? 'pi-zero-2-w';
+        unset($connection['storage_size_gib'], $connection['installer_profile']);
         abort_if((int) $connection['port'] !== 22 || strtolower($connection['user']) === 'root', 422, 'Automatic installation requires SSH port 22 and a non-root Pi username.');
         $this->publicKey();
         $this->assertAvailable($connection);
@@ -21,10 +36,16 @@ class ClientInstallations
         Cache::put($this->cacheKey($token), [
             'connection' => $connection, 'id' => 'USB-'.strtoupper(Str::random(12)),
             'expires_at' => $expires->timestamp, 'host_key' => null,
+            'storage_size_gib' => $storageSize,
+            'installer_profile' => $profile,
         ], $expires);
         $base = rtrim(config('usbcloud.heartbeat_url') ?: config('app.url'), '/');
         $asset = $base.route('client.installation.asset', 'install.sh', false);
         $script = 'set -eu; work=$(mktemp -d); trap \'rm -rf "$work"\' EXIT; curl --fail --silent --show-error --max-time 60 '.escapeshellarg($asset).' -o "$work/install.sh"; sudo bash "$work/install.sh" '.escapeshellarg($base).' '.escapeshellarg($token);
+        if ($storageSize !== null) {
+            $script .= ' --size-gib '.$storageSize;
+        }
+        $script .= ' --profile '.escapeshellarg($profile);
 
         return ['command' => 'bash -c '.escapeshellarg($script), 'expires_at' => $expires->toIso8601String()];
     }
@@ -34,7 +55,7 @@ class ClientInstallations
     {
         $installation = $this->find($token);
 
-        return [...$installation['connection'], 'public_key' => $this->publicKey()];
+        return [...$installation['connection'], 'storage_size_gib' => $installation['storage_size_gib'] ?? null, 'installer_profile' => $installation['installer_profile'] ?? 'pi-zero-2-w', 'public_key' => $this->publicKey()];
     }
 
     /** @return array{device: string, url: string, token: string} */

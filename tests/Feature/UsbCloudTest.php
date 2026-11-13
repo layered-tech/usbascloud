@@ -594,3 +594,61 @@ it('starts with an empty fleet in containers and stores new device archives in t
     expect(app(UsbCloudDevices::class)->all()['GARAGE']['archive_directory'])->toBe('/archive/devices/GARAGE');
     Process::assertNothingRan();
 });
+
+it('opens each fleet location directly with the matching navigation', function (string $path, string $screen, ?string $device, string $section) {
+    fakeUsbDevice();
+
+    $this->get($path)->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('usbcloud')
+        ->where('navigation.screen', $screen)
+        ->where('navigation.device', $device)
+        ->where('navigation.section', $section)
+        ->has('cloud.devices', 1));
+})->with([
+    'home' => ['/', 'devices', null, 'overview'],
+    'fleet' => ['/usbcloud/devices?status=offline&selected=BLINK-PI', 'devices', null, 'overview'],
+    'device' => ['/usbcloud/devices/BLINK-PI', 'device', 'BLINK-PI', 'overview'],
+    'device overview' => ['/usbcloud/devices/BLINK-PI/overview', 'device', 'BLINK-PI', 'overview'],
+    'device files' => ['/usbcloud/devices/BLINK-PI/files', 'device', 'BLINK-PI', 'files'],
+    'device logs' => ['/usbcloud/devices/BLINK-PI/log', 'device', 'BLINK-PI', 'log'],
+    'device settings' => ['/usbcloud/devices/BLINK-PI/settings', 'device', 'BLINK-PI', 'settings'],
+    'files' => ['/usbcloud/files?tab=all&filter_device=BLINK-PI', 'files', null, 'overview'],
+    'gallery' => ['/usbcloud/gallery?filter_q=recording', 'gallery', null, 'overview'],
+    'server logs' => ['/usbcloud/logs', 'log', null, 'overview'],
+    'server settings' => ['/usbcloud/settings', 'settings', null, 'overview'],
+]);
+
+it('returns an Inertia page when navigating between fleet locations', function () {
+    fakeUsbDevice();
+
+    $version = $this->get('/')->viewData('page')['version'];
+
+    $this->withHeaders(['X-Inertia' => 'true', 'X-Inertia-Version' => $version])
+        ->get('/usbcloud/devices/BLINK-PI/settings')
+        ->assertOk()
+        ->assertHeader('X-Inertia', 'true')
+        ->assertJsonPath('component', 'usbcloud')
+        ->assertJsonPath('url', '/usbcloud/devices/BLINK-PI/settings')
+        ->assertJsonPath('props.navigation.section', 'settings');
+});
+
+it('returns 404 for unavailable device locations', function (string $path) {
+    Process::fake();
+
+    $this->get($path)->assertNotFound();
+
+    Process::assertNothingRan();
+})->with([
+    '/usbcloud/devices/UNKNOWN',
+    '/usbcloud/devices/BLINK-PI/unknown',
+]);
+
+it('keeps fleet locations accessible when no devices are configured', function () {
+    config(['usbcloud.include_default_device' => false]);
+    Process::fake();
+
+    $this->get('/usbcloud/files?tab=pulled')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('navigation.screen', 'files')->has('cloud.devices', 0)->has('cloud.files', 0));
+
+    Process::assertNothingRan();
+});

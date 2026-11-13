@@ -9,6 +9,15 @@ use App\Http\Middleware\EnsureTeamMembership;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [UsbCloudController::class, 'index'])->name('home');
+Route::get('/usbcloud/devices', [UsbCloudController::class, 'index'])->name('usbcloud.devices.index');
+Route::get('/usbcloud/devices/{device}/{section?}', [UsbCloudController::class, 'index'])
+    ->whereIn('section', ['overview', 'files', 'log', 'settings'])
+    ->defaults('screen', 'device')
+    ->name('usbcloud.devices.show');
+Route::get('/usbcloud/files', [UsbCloudController::class, 'index'])->defaults('screen', 'files')->name('usbcloud.files.index');
+Route::get('/usbcloud/gallery', [UsbCloudController::class, 'index'])->defaults('screen', 'gallery')->name('usbcloud.gallery');
+Route::get('/usbcloud/logs', [UsbCloudController::class, 'index'])->defaults('screen', 'log')->name('usbcloud.logs');
+Route::get('/usbcloud/settings', [UsbCloudController::class, 'index'])->defaults('screen', 'settings')->name('usbcloud.settings.edit');
 Route::post('/usbcloud/installations', [ClientInstallationController::class, 'store'])->middleware('throttle:20,1')->name('usbcloud.installations.store');
 Route::post('/usbcloud/operate', [UsbCloudController::class, 'operate'])->name('usbcloud.operate');
 Route::get('/usbcloud/discover', [UsbCloudController::class, 'discover'])->name('usbcloud.discover');

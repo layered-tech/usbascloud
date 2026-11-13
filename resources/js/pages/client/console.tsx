@@ -1,7 +1,7 @@
-import {Head, router} from '@inertiajs/react';
+import {Head, Link, router, usePage} from '@inertiajs/react';
 import {ArrowDownToLine, CheckCircle2, HardDrive, RefreshCw, Usb,} from 'lucide-react';
 import {useEffect, useRef, useState} from 'react';
-import {file as clipFile, refresh as refreshStatus, retrieve,} from '@/actions/App/Http/Controllers/ClientConsoleController';
+import {file as clipFile, index as consoleIndex, refresh as refreshStatus, retrieve,} from '@/actions/App/Http/Controllers/ClientConsoleController';
 import {Button} from '@/components/ui/button';
 
 type PiStatus = {
@@ -56,7 +56,6 @@ export default function ClientConsole({
         else setRefreshing(true);
         setError(null);
         setOutput('');
-        if (action === 'retrieve') setSelected(null);
         try {
             const csrf = document.cookie
                 .split('; ')
@@ -131,11 +130,22 @@ export default function ClientConsole({
         } finally {
             setProcessing(false);
             setRefreshing(false);
-            router.reload({ only: ['runs'] });
+            if (action === 'retrieve')
+                router.get(
+                    consoleIndex.url(),
+                    {},
+                    {
+                        only: ['runs'],
+                        preserveState: true,
+                        preserveScroll: true,
+                    },
+                );
+            else router.reload({ only: ['runs'] });
         }
     }
     const [refreshing, setRefreshing] = useState(false);
-    const [selected, setSelected] = useState<string | null>(null);
+    const { url } = usePage();
+    const selected = new URLSearchParams(url.split('?')[1] ?? '').get('run');
     const active = runs.find((run) => run.id === selected) ?? runs[0];
     const usb =
         Object.values(status.state?.usb_state ?? {}).join(', ') || 'Unknown';
@@ -286,11 +296,14 @@ export default function ClientConsole({
                         ) : (
                             <div className="flex flex-col gap-2">
                                 {runs.map((run) => (
-                                    <button
-                                        type="button"
+                                    <Link
+                                        preserveState
+                                        preserveScroll
                                         key={run.id}
-                                        onClick={() => setSelected(run.id)}
-                                        aria-pressed={active?.id === run.id}
+                                        href={consoleIndex.url({
+                                            query: { run: run.id },
+                                        })}
+                                        aria-current={active?.id === run.id}
                                         className={`flex flex-col gap-1 rounded-lg border p-3 text-left text-sm transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring ${active?.id === run.id ? 'border-foreground/30 bg-muted' : ''}`}
                                     >
                                         <span className="font-medium">
@@ -307,7 +320,7 @@ export default function ClientConsole({
                                                 ? `${run.files.length} new · ${run.already_saved ?? 0} already saved`
                                                 : 'Retrieval failed'}
                                         </span>
-                                    </button>
+                                    </Link>
                                 ))}
                             </div>
                         )}

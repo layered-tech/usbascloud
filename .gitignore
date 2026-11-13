@@ -51,7 +51,13 @@ yarn-error.log
 /boost.json
 /opencode.json
 /opencode.jsonc
-
+/.gemini
+/.github
+GEMINI.md
 # Python client caches
 __pycache__/
 *.py[cod]
+.env.before_lerd
+.lerd.yaml
+.node-version
+.php-version

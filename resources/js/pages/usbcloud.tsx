@@ -1,6 +1,6 @@
-import {Head, router, useHttp, usePoll} from '@inertiajs/react';
+import {Head, Link, router, useHttp, usePage, usePoll,} from '@inertiajs/react';
 import {Check, ChevronDown, ChevronRight, CloudDownload, Download, Film, Folder, HardDrive, Menu, Pause, Play, PlugZap, Plus, RefreshCw, Search, Server, Settings2, SlidersHorizontal, Terminal, Trash2, Unplug, X,} from 'lucide-react';
-import type {ButtonHTMLAttributes, ReactNode, Ref} from 'react';
+import type {ButtonHTMLAttributes, ComponentProps, ReactNode, Ref,} from 'react';
 import {useEffect, useRef, useState} from 'react';
 import {addDevice, discover, download, file as downloadFile, operate, removeDevice, settings as saveSettings, testDevice, transfer, updateDevice,} from '@/actions/App/Http/Controllers/UsbCloudController';
 import {store as createInstallation} from '@/actions/App/Http/Controllers/ClientInstallationController';
@@ -10,6 +10,10 @@ import type {DeviceMetrics} from '@/lib/device-health';
 import {deviceHealth} from '@/lib/device-health';
 import type {TransferDismissals} from '@/lib/transfer-dismissals';
 import {dismissTransferRuns, parseTransferDismissals, transferDismissalsKey, visibleTransferDevices,} from '@/lib/transfer-dismissals';
+import {index as devicesIndex, show as deviceShow,} from '@/routes/usbcloud/devices';
+import {index as filesIndex} from '@/routes/usbcloud/files';
+import {gallery, logs} from '@/routes/usbcloud';
+import {edit as settingsEdit} from '@/routes/usbcloud/settings';
 import '../../css/usbcloud.css';
 
 type Theme = 'phosphor' | 'paper';
@@ -215,63 +219,93 @@ function ErrorSummary({ message, theme }: { message: string; theme: Theme }) {
         </div>
     );
 }
+function NavigationLink({
+    children,
+    href,
+    variant = '',
+    small = false,
+    className = '',
+    disabled = false,
+    ...props
+}: Omit<ComponentProps<typeof Link>, 'href'> & {
+    href: string;
+    variant?: string;
+    small?: boolean;
+    disabled?: boolean;
+}) {
+    const classes = `uc-btn ${variant ? `uc-btn-${variant}` : ''} ${small ? 'uc-btn-sm' : ''} ${className}`;
+    if (disabled)
+        return (
+            <button
+                type="button"
+                className={classes}
+                disabled
+                aria-label={props['aria-label']}
+            >
+                {children}
+            </button>
+        );
+    return (
+        <Link href={href} preserveState className={classes} {...props}>
+            {children}
+        </Link>
+    );
+}
 function Tabs({
     items,
     value,
-    onChange,
+    href,
     label,
 }: {
     items: { id: string; label: string; count?: number | null }[];
     value: string;
-    onChange: (id: string) => void;
+    href: (id: string) => string;
     label: string;
 }) {
     return (
-        <div className="uc-tabs" role="tablist" aria-label={label}>
-            {items.map((item, index) => (
-                <button
-                    type="button"
-                    role="tab"
-                    aria-selected={value === item.id}
-                    tabIndex={value === item.id ? 0 : -1}
+        <nav className="uc-tabs" aria-label={label}>
+            {items.map((item) => (
+                <Link
+                    href={href(item.id)}
+                    preserveState
+                    aria-current={value === item.id ? 'page' : undefined}
                     key={item.id}
                     className={`uc-tab uc-label ${value === item.id ? 'uc-tab-active' : ''}`}
-                    onClick={() => onChange(item.id)}
-                    onKeyDown={(event) => {
-                        if (
-                            ![
-                                'ArrowLeft',
-                                'ArrowRight',
-                                'Home',
-                                'End',
-                            ].includes(event.key)
-                        )
-                            return;
-                        event.preventDefault();
-                        const next =
-                            event.key === 'Home'
-                                ? 0
-                                : event.key === 'End'
-                                  ? items.length - 1
-                                  : (index +
-                                        (event.key === 'ArrowRight' ? 1 : -1) +
-                                        items.length) %
-                                    items.length;
-                        onChange(items[next].id);
-                        (
-                            event.currentTarget.parentElement?.children[
-                                next
-                            ] as HTMLElement
-                        )?.focus();
-                    }}
                 >
                     {item.label}
                     {item.count != null && (
                         <span className="uc-tab-count">{item.count}</span>
                     )}
-                </button>
+                </Link>
             ))}
-        </div>
+        </nav>
+    );
+}
+function SearchInput({
+    value,
+    onChange,
+    ...props
+}: Omit<ComponentProps<'input'>, 'value' | 'onChange'> & {
+    value: string;
+    onChange: (value: string) => void;
+}) {
+    const [draft, setDraft] = useState(value);
+    const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+    useEffect(() => {
+        setDraft(value);
+    }, [value]);
+    useEffect(() => () => clearTimeout(timer.current), []);
+    return (
+        <input
+            {...props}
+            value={draft}
+            onChange={(event) => {
+                const next = event.target.value;
+                setDraft(next);
+                clearTimeout(timer.current);
+                timer.current = setTimeout(() => onChange(next), 250);
+            }}
+        />
     );
 }
 function Field({
@@ -1344,20 +1378,81 @@ function DeviceSettings({
     );
 }
 
-export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
-    const [screen, setScreen] = useState<Screen>('devices');
-    const [tab, setTab] = useState('all');
-    const [deviceTab, setDeviceTab] = useState('overview');
-    const [selected, setSelected] = useState(cloud.devices[0]?.id ?? '');
-    const [fileTab, setFileTab] = useState('pending');
-    const [filters, setFilters] = useState<
-        Record<string, Record<string, string>>
-    >({});
+export default function UsbCloudPage({
+    cloud,
+    navigation,
+}: {
+    cloud: Cloud;
+    navigation: { screen: Screen; device: string | null; section: string };
+}) {
+    const { url } = usePage();
+    const query = new URLSearchParams(url.split('?')[1] ?? '');
+    const screen = navigation.screen;
+    const tab = query.get('status') ?? 'all';
+    const deviceTab = navigation.section;
+    const selected = navigation.device ?? query.get('selected') ?? '';
+    const fileTab = query.get('tab') ?? 'pending';
+    const filters = Object.fromEntries(
+        [...query.entries()]
+            .filter(([key]) => key.startsWith('filter_'))
+            .map(([key, value]) => [key.slice(7), value]),
+    );
+    const deviceHref = (id: string, section = 'overview') =>
+        deviceShow.url({
+            device: id,
+            section: section === 'overview' ? undefined : section,
+        });
+    const screenHref = (
+        next: Screen,
+        params: Record<string, string> = {},
+    ): string => {
+        const options = { query: params };
+        switch (next) {
+            case 'device':
+                return deviceShow.url(
+                    {
+                        device: navigation.device ?? selected,
+                        section:
+                            deviceTab === 'overview' ? undefined : deviceTab,
+                    },
+                    options,
+                );
+            case 'devices':
+                return devicesIndex.url(options);
+            case 'files':
+                return filesIndex.url(options);
+            case 'gallery':
+                return gallery.url(options);
+            case 'log':
+                return logs.url(options);
+            case 'settings':
+                return settingsEdit.url(options);
+        }
+    };
+    const locationHref = (updates: Record<string, string | null>) => {
+        const params = Object.fromEntries(
+            [...query.entries()].filter(
+                ([key]) =>
+                    key !== 'log_devices' && !key.startsWith('log_devices['),
+            ),
+        );
+        for (const [key, value] of Object.entries(updates)) {
+            if (value === null || value === '') delete params[key];
+            else params[key] = value;
+        }
+        return screenHref(screen, params);
+    };
+    const visit = (href: string, replace = false) =>
+        router.visit(href, {
+            preserveState: true,
+            preserveScroll: true,
+            replace,
+        });
     const [filterOpen, setFilterOpen] = useState<Record<string, boolean>>({});
     const [mobileNav, setMobileNav] = useState(false);
     const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
-    const [previewId, setPreviewId] = useState('');
-    const [galleryId, setGalleryId] = useState('');
+    const previewId = query.get('preview') ?? '';
+    const galleryId = query.get('clip') ?? '';
     const [message, setMessage] = useState('');
     const [error, setError] = useState(false);
     const [working, setWorking] = useState('');
@@ -1433,18 +1528,21 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
         .join(',');
     usePoll(1500, () => ({
         only: ['cloud'],
+        preserveUrl: true,
         data: { log_devices: logDeviceKey ? logDeviceKey.split(',') : [] },
     }));
     useEffect(() => {
         if (logDeviceKey)
             router.reload({
                 only: ['cloud'],
+                preserveUrl: true,
                 data: { log_devices: logDeviceKey.split(',') },
             });
     }, [logDeviceKey]);
     const reload = () =>
         router.reload({
             only: ['cloud'],
+            preserveUrl: true,
             data: { log_devices: logDeviceKey ? logDeviceKey.split(',') : [] },
         });
     const notify = (text: string, failed = false) => {
@@ -1452,27 +1550,34 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
         setError(failed);
         requestAnimationFrame(() => notice.current?.focus());
     };
-    const navigate = (next: Screen) => {
-        setScreen(next);
-        setMobileNav(false);
-        setMessage('');
-    };
-    const openDevice = (id: string, tab = 'overview') => {
-        setSelected(id);
-        setDeviceTab(tab);
-        navigate('device');
-    };
+    const navigateAfterAction = (href: string): Promise<void> =>
+        new Promise((resolve) => {
+            router.visit(href, {
+                preserveState: true,
+                preserveScroll: true,
+                onFinish: () => resolve(),
+            });
+            setMobileNav(false);
+        });
     const getFilter = (page: string, key: string, fallback = 'any') =>
-        filters[page]?.[key] ?? fallback;
-    const setFilter = (page: string, key: string, value: string) =>
-        setFilters((old) => ({
-            ...old,
-            [page]: { ...old[page], [key]: value },
-        }));
+        page === screen ? (filters[key] ?? fallback) : fallback;
+    const setFilter = (_page: string, key: string, value: string) =>
+        visit(locationHref({ [`filter_${key}`]: value }), key === 'q');
     const filterCount = (page: string) =>
-        Object.entries(filters[page] ?? {}).filter(
-            ([key, value]) => key !== 'sort' && value !== '' && value !== 'any',
-        ).length;
+        page === screen
+            ? Object.entries(filters).filter(
+                  ([key, value]) =>
+                      key !== 'sort' && value !== '' && value !== 'any',
+              ).length
+            : 0;
+    const clearFilters = () =>
+        visit(
+            locationHref(
+                Object.fromEntries(
+                    Object.keys(filters).map((key) => [`filter_${key}`, null]),
+                ),
+            ),
+        );
     const deviceOptions: [string, string][] = [
         ['any', 'Any device'],
         ...[
@@ -1612,12 +1717,12 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
             setScanBusy(false);
         }
     }
-    function showFiles(id: string) {
-        navigate('files');
-        setFilter('files', 'device', id);
-        setFileTab('all');
-        setFilterOpen((old) => ({ ...old, files: true }));
-    }
+    const filesHref = (id: string, preview = '') =>
+        screenHref('files', {
+            filter_device: id,
+            tab: 'all',
+            ...(preview ? { preview } : {}),
+        });
     const matches = (
         page: string,
         key: string,
@@ -1807,12 +1912,14 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
     );
     function filterBar(page: string) {
         return (
-            filterOpen[page] && (
+            (filterOpen[page] ??
+                (page === screen && Object.keys(filters).length > 0)) && (
                 <div className="uc-filter-bar">
                     <Field label="Search">
                         <div className="uc-field">
                             <Search size={14} />
-                            <input
+                            <SearchInput
+                                key={page}
                                 aria-label={
                                     page === 'devices'
                                         ? 'Search devices'
@@ -1826,8 +1933,8 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                         ? 'ID, name, host or address'
                                         : 'File name or path'
                                 }
-                                onChange={(e) =>
-                                    setFilter(page, 'q', e.target.value)
+                                onChange={(value) =>
+                                    setFilter(page, 'q', value)
                                 }
                             />
                         </div>
@@ -1956,12 +2063,7 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                             )}
                         </>
                     )}
-                    <Button
-                        variant="ghost"
-                        onClick={() =>
-                            setFilters((old) => ({ ...old, [page]: {} }))
-                        }
-                    >
+                    <Button variant="ghost" onClick={() => clearFilters()}>
                         <X size={14} />
                         Clear
                     </Button>
@@ -2077,19 +2179,21 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                     </td>
                                 )}
                                 <td>
-                                    <button
-                                        type="button"
+                                    <Link
+                                        preserveState
+
                                         className="uc-row-select uc-file-name"
                                         title={f.name}
-                                        onClick={() => {
-                                            setPreviewId(f.id);
-                                            if (screen === 'device') {
-                                                showFiles(f.device);
-                                            }
-                                        }}
+                                        href={
+                                            screen === 'device'
+                                                ? filesHref(f.device, f.id)
+                                                : locationHref({
+                                                      preview: f.id,
+                                                  })
+                                        }
                                     >
                                         {f.name.split('/').at(-1)}
-                                    </button>
+                                    </Link>
                                 </td>
                                 <td>{f.device}</td>
                                 <td className="uc-right">{bytes(f.bytes)}</td>
@@ -2306,30 +2410,30 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                     </details>
                 )}
                 <div className="uc-detail-footer uc-card-actions">
-                    <Button
+                    <NavigationLink
                         small
                         variant="ghost"
-                        onClick={() => showFiles(d.id)}
+                        href={filesHref(d.id)}
                     >
                         <Folder size={14} />
                         Files
-                    </Button>
-                    <Button
+                    </NavigationLink>
+                    <NavigationLink
                         small
                         variant="ghost"
-                        onClick={() => openDevice(d.id, 'log')}
+                        href={deviceHref(d.id, 'log')}
                     >
                         <Terminal size={14} />
                         Log
-                    </Button>
-                    <Button
+                    </NavigationLink>
+                    <NavigationLink
                         small
                         variant="primary"
-                        onClick={() => openDevice(d.id)}
+                        href={deviceHref(d.id)}
                     >
                         <ChevronRight size={14} />
                         Open device
-                    </Button>
+                    </NavigationLink>
                 </div>
             </section>
         );
@@ -2343,13 +2447,17 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                     items={[
                         [
                             'Device',
-                            <button
-                                className="uc-text-button"
-                                disabled={!d}
-                                onClick={() => openDevice(f.device)}
-                            >
-                                {f.device}
-                            </button>,
+                            d ? (
+                                <Link
+                                    preserveState
+                                    className="uc-text-button"
+                                    href={deviceHref(f.device)}
+                                >
+                                    {f.device}
+                                </Link>
+                            ) : (
+                                f.device
+                            ),
                         ],
                         ['Recorded', date(f.modified_at)],
                         ['Size', bytes(f.bytes)],
@@ -2406,30 +2514,23 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                         </Button>
                     )}
                     {isVideo(f) && screen !== 'gallery' && (
-                        <Button
+                        <NavigationLink
                             small
                             variant="ghost"
-                            onClick={() => {
-                                setGalleryId(f.id);
-                                setFilters((old) => ({ ...old, gallery: {} }));
-                                navigate('gallery');
-                            }}
+                            href={screenHref('gallery', { clip: f.id })}
                         >
                             <Film size={14} />
                             Gallery
-                        </Button>
+                        </NavigationLink>
                     )}
-                    <Button
+                    <NavigationLink
                         small
                         variant="ghost"
-                        onClick={() => {
-                            setPreviewId(f.id);
-                            showFiles(f.device);
-                        }}
+                        href={filesHref(f.device, f.id)}
                     >
                         <Folder size={14} />
                         Files
-                    </Button>
+                    </NavigationLink>
                 </div>
             </section>
         );
@@ -2629,8 +2730,9 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                             <ul className="uc-sidenav-list">
                                 {group.items.map((item) => (
                                     <li key={item.id}>
-                                        <button
-                                            type="button"
+                                        <Link
+                                            href={screenHref(item.id)}
+                                            preserveState
                                             className={`uc-sidenav-item ${screen === item.id || (screen === 'device' && item.id === 'devices') ? 'uc-sidenav-item-active' : ''}`}
                                             aria-current={
                                                 screen === item.id ||
@@ -2639,7 +2741,10 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                                     ? 'page'
                                                     : undefined
                                             }
-                                            onClick={() => navigate(item.id)}
+                                            onSuccess={() => {
+                                                setMobileNav(false);
+                                                setMessage('');
+                                            }}
                                         >
                                             <span className="uc-sidenav-caret">
                                                 &gt;
@@ -2653,7 +2758,7 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                                     {item.count}
                                                 </span>
                                             )}
-                                        </button>
+                                        </Link>
                                     </li>
                                 ))}
                             </ul>
@@ -2695,11 +2800,17 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                             ) && (
                                 <Button
                                     variant="ghost"
-                                    aria-expanded={!!filterOpen[screen]}
+                                    aria-expanded={
+                                        filterOpen[screen] ??
+                                        Object.keys(filters).length > 0
+                                    }
                                     onClick={() =>
                                         setFilterOpen((old) => ({
                                             ...old,
-                                            [screen]: !old[screen],
+                                            [screen]: !(
+                                                old[screen] ??
+                                                Object.keys(filters).length > 0
+                                            ),
                                         }))
                                     }
                                 >
@@ -2802,12 +2913,12 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                             )}
                             {screen === 'device' && active && (
                                 <>
-                                    <Button
+                                    <NavigationLink
                                         variant="ghost"
-                                        onClick={() => navigate('devices')}
+                                        href={devicesIndex.url()}
                                     >
                                         Back to fleet
-                                    </Button>
+                                    </NavigationLink>
                                     <Button
                                         disabled={!!working}
                                         onClick={() =>
@@ -2903,7 +3014,7 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                         <Tabs
                             label="Device status"
                             value={tab}
-                            onChange={setTab}
+                            href={(status) => locationHref({ status })}
                             items={[
                                 {
                                     id: 'all',
@@ -2939,7 +3050,7 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                         <Tabs
                             label="Device sections"
                             value={deviceTab}
-                            onChange={setDeviceTab}
+                            href={(section) => deviceHref(active.id, section)}
                             items={[
                                 { id: 'overview', label: 'Overview' },
                                 {
@@ -2958,7 +3069,7 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                         <Tabs
                             label="File state"
                             value={fileTab}
-                            onChange={setFileTab}
+                            href={(tab) => locationHref({ tab, preview: null })}
                             items={[
                                 'pending',
                                 'inflight',
@@ -3132,22 +3243,21 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                                     }
                                                 >
                                                     <td className="uc-key">
-                                                        <button
-                                                            type="button"
+                                                        <Link
+                                                            preserveState
+
                                                             className="uc-row-select"
                                                             aria-label={`Select ${d.id}`}
-                                                            aria-pressed={
+                                                            aria-current={
                                                                 active?.id ===
                                                                 d.id
                                                             }
-                                                            onClick={() =>
-                                                                setSelected(
-                                                                    d.id,
-                                                                )
-                                                            }
+                                                            href={locationHref({
+                                                                selected: d.id,
+                                                            })}
                                                         >
                                                             {d.id}
-                                                        </button>
+                                                        </Link>
                                                     </td>
                                                     <td>{d.name}</td>
                                                     <td>
@@ -3197,18 +3307,18 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                                         {ago(d.last_sync)}
                                                     </td>
                                                     <td>
-                                                        <Button
+                                                        <NavigationLink
                                                             small
                                                             variant="ghost"
                                                             aria-label={`Open ${d.id}`}
-                                                            onClick={() =>
-                                                                openDevice(d.id)
-                                                            }
+                                                            href={deviceHref(
+                                                                d.id,
+                                                            )}
                                                         >
                                                             <ChevronRight
                                                                 size={14}
                                                             />
-                                                        </Button>
+                                                        </NavigationLink>
                                                     </td>
                                                 </tr>
                                             ))}
@@ -3568,16 +3678,17 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                                 ]}
                                             />
                                             <div className="uc-card-actions">
-                                                <Button
+                                                <NavigationLink
                                                     small
                                                     variant="ghost"
-                                                    onClick={() =>
-                                                        setDeviceTab('settings')
-                                                    }
+                                                    href={deviceHref(
+                                                        active.id,
+                                                        'settings',
+                                                    )}
                                                 >
                                                     <Settings2 size={14} />
                                                     Settings
-                                                </Button>
+                                                </NavigationLink>
                                             </div>
                                         </section>
                                         {fileTable(
@@ -3608,16 +3719,17 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                             cloud.logs.devices[active.id] ?? []
                                         }
                                         actions={
-                                            <Button
+                                            <NavigationLink
                                                 small
                                                 variant="ghost"
-                                                onClick={() =>
-                                                    setDeviceTab('log')
-                                                }
+                                                href={deviceHref(
+                                                    active.id,
+                                                    'log',
+                                                )}
                                             >
                                                 <Terminal size={14} />
                                                 Full log
-                                            </Button>
+                                            </NavigationLink>
                                         }
                                     />
                                 </div>
@@ -3694,16 +3806,16 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                                         .split('/')
                                                         .at(-1)}
                                                 </h2>
-                                                <Button
+                                                <NavigationLink
                                                     small
                                                     variant="ghost"
                                                     aria-label="Close preview"
-                                                    onClick={() =>
-                                                        setPreviewId('')
-                                                    }
+                                                    href={locationHref({
+                                                        preview: null,
+                                                    })}
                                                 >
                                                     <X size={14} />
-                                                </Button>
+                                                </NavigationLink>
                                             </div>
                                             <MediaPlayer
                                                 key={preview.id}
@@ -3732,14 +3844,15 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                     aria-label="Clips"
                                 >
                                     {videos.map((f) => (
-                                        <button
-                                            type="button"
+                                        <Link
+                                            preserveState
+
                                             key={f.id}
                                             className={`uc-clip ${f.id === currentClip?.id ? 'uc-clip-selected' : ''}`}
-                                            aria-pressed={
+                                            aria-current={
                                                 f.id === currentClip?.id
                                             }
-                                            onClick={() => setGalleryId(f.id)}
+                                            href={locationHref({ clip: f.id })}
                                         >
                                             <span className="uc-clip-thumbnail">
                                                 {f.state === 'pulled' ? (
@@ -3778,7 +3891,7 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                             <span className="uc-data uc-muted">
                                                 {date(f.modified_at)}
                                             </span>
-                                        </button>
+                                        </Link>
                                     ))}
                                     {!videos.length && (
                                         <p className="uc-data uc-muted">
@@ -3803,25 +3916,24 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                                     </h2>
                                                 </div>
                                                 <div className="uc-inline">
-                                                    <Button
+                                                    <NavigationLink
                                                         small
                                                         variant="ghost"
                                                         aria-label="Previous clip"
                                                         disabled={
                                                             currentIndex <= 0
                                                         }
-                                                        onClick={() =>
-                                                            setGalleryId(
+                                                        href={locationHref({
+                                                            clip:
                                                                 videos[
                                                                     currentIndex -
                                                                         1
-                                                                ].id,
-                                                            )
-                                                        }
+                                                                ]?.id ?? '',
+                                                        })}
                                                     >
                                                         Prev
-                                                    </Button>
-                                                    <Button
+                                                    </NavigationLink>
+                                                    <NavigationLink
                                                         small
                                                         variant="ghost"
                                                         aria-label="Next clip"
@@ -3829,20 +3941,19 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                                             currentIndex >=
                                                             videos.length - 1
                                                         }
-                                                        onClick={() =>
-                                                            setGalleryId(
+                                                        href={locationHref({
+                                                            clip:
                                                                 videos[
                                                                     currentIndex +
                                                                         1
-                                                                ].id,
-                                                            )
-                                                        }
+                                                                ]?.id ?? '',
+                                                        })}
                                                     >
                                                         Next
                                                         <ChevronRight
                                                             size={14}
                                                         />
-                                                    </Button>
+                                                    </NavigationLink>
                                                 </div>
                                             </div>
                                             <MediaPlayer
@@ -3880,19 +3991,17 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                                             )?.name
                                                         }
                                                     </p>
-                                                    <Button
+                                                    <NavigationLink
                                                         small
-                                                        onClick={() =>
-                                                            openDevice(
-                                                                currentClip.device,
-                                                            )
-                                                        }
+                                                        href={deviceHref(
+                                                            currentClip.device,
+                                                        )}
                                                     >
                                                         Open device
                                                         <ChevronRight
                                                             size={14}
                                                         />
-                                                    </Button>
+                                                    </NavigationLink>
                                                 </section>
                                             )}
                                         </aside>
@@ -4323,7 +4432,9 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                                 'DELETE',
                                             );
                                             setRemove(null);
-                                            navigate('devices');
+                                            await navigateAfterAction(
+                                                devicesIndex.url(),
+                                            );
                                             notify(result.message);
                                         },
                                     )
@@ -4385,15 +4496,15 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                                 </div>
                                             </div>
                                             {f.id ? (
-                                                <Button
+                                                <NavigationLink
                                                     small
-                                                    onClick={() => {
-                                                        setAddOpen(false);
-                                                        openDevice(f.id!);
-                                                    }}
+                                                    href={deviceHref(f.id!)}
+                                                    onSuccess={() =>
+                                                        setAddOpen(false)
+                                                    }
                                                 >
                                                     Open {f.id}
-                                                </Button>
+                                                </NavigationLink>
                                             ) : (
                                                 <Button
                                                     small
@@ -4469,7 +4580,13 @@ export default function UsbCloudPage({ cloud }: { cloud: Cloud }) {
                                                 user: 'pi',
                                                 name: '',
                                             });
-                                            setSelected(result.device);
+                                            await navigateAfterAction(
+                                                devicesIndex.url({
+                                                    query: {
+                                                        selected: result.device,
+                                                    },
+                                                }),
+                                            );
                                             notify(`Added ${result.device}.`);
                                         } catch (failure) {
                                             setAddError(

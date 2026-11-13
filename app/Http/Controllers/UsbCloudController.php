@@ -26,7 +26,17 @@ class UsbCloudController extends Controller
     {
         $data = $request->validate(['log_devices' => ['sometimes', 'array', 'max:100'], 'log_devices.*' => ['string', Rule::in(array_keys($cloud->connections()))]]);
 
-        return Inertia::render('usbcloud', ['cloud' => fn (): array => $cloud->dashboard($data['log_devices'] ?? [])]);
+        $device = $request->route('device');
+        abort_if($device !== null && ! isset($cloud->connections()[$device]), 404);
+
+        return Inertia::render('usbcloud', [
+            'navigation' => [
+                'screen' => $request->route('screen', 'devices'),
+                'device' => $device,
+                'section' => $request->route('section', 'overview'),
+            ],
+            'cloud' => fn (): array => $cloud->dashboard($data['log_devices'] ?? []),
+        ]);
     }
 
     public function operate(Request $request, UsbCloud $cloud): StreamedResponse

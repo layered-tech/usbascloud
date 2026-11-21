@@ -563,12 +563,27 @@ it('reports health warnings and waiting state independently from heartbeat conne
     app(UsbCloudDevices::class)->save('BLINK-PI', ['heartbeat_token_hash' => hash('sha256', 'secret')]);
     expect(app(UsbCloud::class)->dashboard()['devices'][0])->toMatchArray(['status' => 'offline', 'checked_at' => null, 'metrics' => null]);
     $state = heartbeatState();
-    $state['metrics'] = ['cpu_temperature_c' => 80, 'memory_used_percent' => 90, 'root_used_percent' => 90, 'throttled_flags' => 1];
+    $state['metrics'] = ['cpu_temperature_c' => 80, 'memory_used_percent' => 90, 'root_used_percent' => 98, 'throttled_flags' => 1];
     $this->withToken('secret')->postJson(route('devices.heartbeat', 'BLINK-PI'), $state)->assertOk();
     $device = app(UsbCloud::class)->dashboard()['devices'][0];
     expect($device['status'])->toBe('fault');
     expect($device['health_warnings'])->toHaveCount(4);
 });
+
+it('marks the device as fault when system disk usage reaches 98 percent', function (float $usage, string $status, array $warnings) {
+    app(UsbCloudDevices::class)->save('BLINK-PI', ['heartbeat_token_hash' => hash('sha256', 'secret')]);
+    $state = heartbeatState();
+    $state['metrics']['root_used_percent'] = $usage;
+
+    $this->withToken('secret')->postJson(route('devices.heartbeat', 'BLINK-PI'), $state)->assertOk();
+
+    expect(app(UsbCloud::class)->dashboard()['devices'][0])
+        ->toMatchArray(['status' => $status, 'health_warnings' => $warnings]);
+})->with([
+    'reported usage' => [90.9, 'online', []],
+    'just below threshold' => [97.9, 'online', []],
+    'at threshold' => [98.0, 'fault', ['System disk usage ≥ 98%']],
+]);
 
 it('rotates heartbeat credentials without exposing their plaintext and rolls back failed setup', function () {
     fakeUsbDevice();

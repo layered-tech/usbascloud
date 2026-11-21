@@ -64,8 +64,8 @@ class DeviceHeartbeats
         if (($metrics['memory_used_percent'] ?? 0) >= 90) {
             $warnings[] = 'Memory usage ≥ 90%';
         }
-        if (($metrics['root_used_percent'] ?? 0) >= 90) {
-            $warnings[] = 'System disk usage ≥ 90%';
+        if (($metrics['root_used_percent'] ?? 0) >= 98) {
+            $warnings[] = 'System disk usage ≥ 98%';
         }
         if (($metrics['throttled_flags'] ?? 0) & 0xF) {
             $warnings[] = 'Power or thermal throttling active';

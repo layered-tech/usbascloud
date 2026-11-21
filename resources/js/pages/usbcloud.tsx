@@ -139,6 +139,19 @@ const bytes = (value: number | undefined | null) => {
     return `${(value / 1000 ** unit).toLocaleString(undefined, { maximumFractionDigits: 1 })} ${['B', 'KB', 'MB', 'GB', 'TB'][unit]}`;
 };
 const date = (at: string | null) => (at ? new Date(at).toLocaleString() : '—');
+const logTimestamp = new Intl.DateTimeFormat(undefined, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+});
+const logDate = (at: string) => {
+    const timestamp = Date.parse(at);
+    return Number.isFinite(timestamp) ? logTimestamp.format(timestamp) : '—';
+};
 const ago = (at: string | null) => {
     if (!at) return 'Never';
     const seconds = Math.max(
@@ -673,10 +686,8 @@ function LogPane({
                         key={`${entry.at}-${i}`}
                         className={`uc-log-line uc-log-${entry.level}`}
                     >
-                        <time className="uc-log-time" title={date(entry.at)}>
-                            {new Date(entry.at).toLocaleTimeString([], {
-                                hour12: false,
-                            })}
+                        <time className="uc-log-time" dateTime={entry.at}>
+                            {logDate(entry.at)}
                         </time>
                         <span className="uc-log-level">
                             {entry.level.toUpperCase()}
@@ -737,16 +748,26 @@ type Transfer = {
 type TransferAction = 'start' | 'pause' | 'resume' | 'cancel';
 const isActive = (t: Transfer | null) =>
     !!t && ['queued', 'running', 'pausing', 'cancelling'].includes(t.state);
-const nextSync = (device: Device, defaults: CloudSettings) =>
-    device.transfer?.state === 'paused'
-        ? 'Paused · resume manually'
-        : isActive(device.transfer)
-          ? 'Running now'
-          : !(device.config.auto_sync ?? defaults.auto_pull)
-            ? 'Manual only'
-            : device.next_sync
-              ? `in ${Math.max(0, Math.ceil((Date.parse(device.next_sync) - Date.now()) / 1000))} s`
-              : 'Waiting for scheduler';
+const nextSync = (device: Device, defaults: CloudSettings) => {
+    if (device.transfer?.state === 'paused') return 'Paused · resume manually';
+    if (isActive(device.transfer)) return 'Running now';
+    if (!(device.config.auto_sync ?? defaults.auto_pull)) return 'Manual only';
+
+    const scheduledAt = device.next_sync ? Date.parse(device.next_sync) : NaN;
+    if (!Number.isFinite(scheduledAt)) return 'Waiting for scheduler';
+
+    const seconds = Math.max(0, Math.ceil((scheduledAt - Date.now()) / 1000));
+    if (seconds < 60) return `in ${seconds} s`;
+
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `in ${minutes} min`;
+
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return remainingMinutes > 0
+        ? `in ${hours} h ${remainingMinutes} min`
+        : `in ${hours} h`;
+};
 const isVideo = (file: StoredFile) => /\.(mp4|webm|mov|m4v)$/i.test(file.name);
 const kind = (file: StoredFile) =>
     isVideo(file)

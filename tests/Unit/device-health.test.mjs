@@ -62,8 +62,8 @@ test('health warnings begin at the design thresholds', () => {
             reason: 'memory high',
         },
         {
-            normal: { root_used_percent: 85 },
-            high: { root_used_percent: 85.1 },
+            normal: { root_used_percent: 97.9 },
+            high: { root_used_percent: 98 },
             field: 'diskHigh',
             reason: 'system disk nearly full',
         },

@@ -754,15 +754,16 @@
 }
 .uc-log-line {
     display: grid;
-    grid-template-columns: 72px 40px auto 1fr;
+    grid-template-columns: max-content 40px auto 1fr;
     column-gap: var(--space-3);
     align-items: baseline;
 }
 .uc-log-line:has(.uc-log-source) {
-    grid-template-columns: 72px 40px 128px 1fr;
+    grid-template-columns: max-content 40px 128px 1fr;
 }
 .uc-log-time {
     color: var(--ink-muted);
+    white-space: nowrap;
 }
 .uc-log-level {
     color: var(--ink-muted);
@@ -1344,7 +1345,7 @@
 }
 .usbcloud .uc-log-line,
 .usbcloud .uc-log-line:has(.uc-log-source) {
-    grid-template-columns: 72px 40px 112px minmax(0, 1fr);
+    grid-template-columns: max-content 40px 112px minmax(0, 1fr);
     min-width: 0;
 }
 .uc-log-head {
@@ -1555,7 +1556,7 @@
     }
     .usbcloud .uc-log-line,
     .usbcloud .uc-log-line:has(.uc-log-source) {
-        grid-template-columns: 64px 40px minmax(0, 1fr);
+        grid-template-columns: max-content 40px minmax(0, 1fr);
     }
     .uc-log-msg {
         grid-column: 1 / -1;
@@ -1964,7 +1965,7 @@
 @container (max-width: 500px) {
     .usbcloud .uc-log-line,
     .usbcloud .uc-log-line:has(.uc-log-source) {
-        grid-template-columns: 72px 40px minmax(0, 1fr);
+        grid-template-columns: max-content 40px minmax(0, 1fr);
         gap: 4px 8px;
         padding-block: 6px;
     }
@@ -2052,7 +2053,7 @@
 }
 .usbcloud .uc-log-no-wrap .uc-log-line,
 .usbcloud .uc-log-no-wrap .uc-log-line:has(.uc-log-source) {
-    grid-template-columns: 72px 40px 112px max-content;
+    grid-template-columns: max-content 40px 112px max-content;
     width: max-content;
     min-width: 100%;
 }

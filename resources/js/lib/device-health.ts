@@ -34,7 +34,7 @@ export function deviceHealth(
     const temperatureHigh = (metrics?.cpu_temperature_c ?? 0) >= 70;
     const loadHigh = loadPercent != null && loadPercent > 80;
     const memoryHigh = (metrics?.memory_used_percent ?? 0) > 85;
-    const diskHigh = (metrics?.root_used_percent ?? 0) > 85;
+    const diskHigh = (metrics?.root_used_percent ?? 0) >= 98;
     const reason = currentFlags.length
         ? currentFlags[0]
         : temperatureHigh
